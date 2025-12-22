@@ -87,8 +87,8 @@ class ChatbotService
         // Add conversation history
         foreach ($conversationHistory as $msg) {
             $messages[] = [
-                'role' => $msg->sender_type === 'user' ? 'user' : 'assistant',
-                'content' => $msg->content
+                'role' => $msg['sender_type'] === 'user' ? 'user' : 'assistant',
+                'content' => $msg['content']
             ];
         }
 
@@ -134,7 +134,7 @@ class ChatbotService
         // Build conversation context
         $context = $this->getSystemPrompt() . "\n\n";
         foreach ($conversationHistory as $msg) {
-            $context .= ($msg->sender_type === 'user' ? 'Utilisateur: ' : 'Madame Sophie: ') . $msg->content . "\n";
+            $context .= ($msg['sender_type'] === 'user' ? 'Utilisateur: ' : 'Madame Sophie: ') . $msg['content'] . "\n";
         }
         $context .= "Utilisateur: " . $userMessage . "\nMadame Sophie: ";
 
@@ -200,12 +200,42 @@ class ChatbotService
      */
     protected function getSystemPrompt(): string
     {
-        return config(
-            'chatbot.system_prompt',
-            "Tu es Madame Sophie, une assistante virtuelle bienveillante et professionnelle pour Bisou Bisou, " .
-            "une institution de microfinance. Tu aides les clients avec des informations sur les prêts, " .
-            "l'épargne, les conditions d'éligibilité, et les procédures. Tu es toujours polie, claire et concise. " .
-            "Tu réponds en français et tu es là pour faciliter l'accès aux services financiers."
-        );
+        $basePrompt = "Tu es Madame Sophie, l’assistante virtuelle officielle de l’IMF Bisou Bisou.\n\n" .
+            "TON RÔLE :\n" .
+            "Tu es une experte des produits financiers de Bisou Bisou. Ton but est d'aider les clients à comprendre nos offres et à les orienter.\n\n" .
+            "RÈGLES STRICTES :\n" .
+            "- Tu fournis uniquement des informations à titre informatif.\n" .
+            "- Tu n’inventes jamais de produits, taux, montants ou conditions.\n" .
+            "- Tu utilises exclusivement les informations fournies dans le CONTEXTE DES PRODUITS ci-dessous.\n" .
+            "- Tu ne donnes aucun conseil financier personnalisé.\n" .
+            "- Tu ne demandes aucune donnée personnelle (numéro de compte, mot de passe, etc.).\n\n" .
+            "STYLE & TON :\n" .
+            "- Professionnel, bienveillant et rassurant.\n" .
+            "- Langage clair et simple (évite le jargon technique inutile).\n" .
+            "- Adapté au public de la République Démocratique du Congo (RDC).\n\n" .
+            "GESTION DU MENU :\n" .
+            "- Si l'utilisateur demande à voir le menu, les options, ou s'il semble vouloir naviguer de manière générale, ajoute impérativement le mot-clé [TRIGGER_MENU] à la fin de ta réponse.\n" .
+            "- Si l'utilisateur te salue (Bonjour, etc.), réponds poliment et ajoute [TRIGGER_MENU] pour lui proposer les options.\n\n" .
+            "OBLIGATOIRE :\n" .
+            "- Termine toujours tes réponses par : \"Pour plus de détails, veuillez vous rapprocher d’une agence IMF Bisou Bisou.\"\n\n" .
+            "Si une information est manquante dans le contexte, réponds poliment que tu n'as pas cette information précise et termine par : \"Veuillez vous rapprocher d’une agence IMF Bisou Bisou pour plus de détails.\"";
+
+        // Add dynamic product information
+        $accounts = \App\Models\Account::where('is_active', true)->get();
+        $credits = \App\Models\Credit::where('is_active', true)->get();
+
+        $productContext = "\n\nCONTEXTE DES PRODUITS DISPONIBLES :\n\n";
+
+        $productContext .= "--- COMPTES ET ÉPARGNE ---\n";
+        foreach ($accounts as $account) {
+            $productContext .= "- {$account->display_name} ({$account->account_type}) : Devise {$account->currency}, Taux {$account->interest_rate}, Dépôt initial {$account->initial_deposit}, Frais de tenue {$account->maintenance_fee}.\n";
+        }
+
+        $productContext .= "\n--- CRÉDITS ET PRÊTS ---\n";
+        foreach ($credits as $credit) {
+            $productContext .= "- {$credit->display_name} : Montant {$credit->amount_range}, Durée {$credit->duration_range}, Taux {$credit->interest_rate}, Frais d'étude {$credit->file_fee}, Garantie: {$credit->guarantee}.\n";
+        }
+
+        return $basePrompt . $productContext;
     }
 }

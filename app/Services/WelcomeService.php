@@ -15,7 +15,20 @@ class WelcomeService
     }
 
     /**
-     * Send welcome message with main menu buttons
+     * Send initial greeting message (text only)
+     */
+    public function sendGreetingMessage(string $userIdentifier): bool
+    {
+        $bodyText = "Bonjour 👋\n" .
+            "Je suis Sophie, l’assistante virtuelle de l’IMF Bisou Bisou.\n" .
+            "Comment puis-je vous aider ?\n\n" .
+            "👉 Tapez *Menu* pour afficher les options.";
+
+        return $this->webhookService->sendWhatsAppMessage($userIdentifier, $bodyText);
+    }
+
+    /**
+     * Send main menu buttons
      */
     public function sendWelcomeMessage(string $userIdentifier): bool
     {
@@ -24,27 +37,27 @@ class WelcomeService
                 'type' => 'reply',
                 'reply' => [
                     'id' => 'btn_about',
-                    'title' => 'À propos de l’IMF'  // 12 caractères
+                    'title' => 'À propos de l’IMF'
                 ]
             ],
             [
                 'type' => 'reply',
                 'reply' => [
                     'id' => 'btn_products',
-                    'title' => 'Produits & Services'  // 15 caractères
+                    'title' => 'Produits & Services'
                 ]
             ],
             [
                 'type' => 'reply',
                 'reply' => [
                     'id' => 'btn_help',
-                    'title' => 'Aide & Orientation'  // 6 caractères
+                    'title' => 'Aide & Orientation'
                 ]
             ]
         ];
 
-        $bodyText = "Je suis Madame Sophie, l'assistante virtuelle de l'IMF Bisou Bisou.\n\nVeuillez choisir une option :";
-        $headerText = "Bonjour 👋";
+        $bodyText = "Veuillez choisir une option dans le menu ci-dessous :";
+        $headerText = "Menu Principal 📋";
 
         return $this->webhookService->sendButtons(
             $userIdentifier,
@@ -205,7 +218,7 @@ class WelcomeService
     /**
      * Send response with "Revenir au Menu" button
      */
-    protected function sendResponseWithMenuButton(string $userIdentifier, string $message): bool
+    public function sendResponseWithMenuButton(string $userIdentifier, string $message): bool
     {
         $buttons = [
             [
@@ -399,13 +412,21 @@ class WelcomeService
     }
 
     /**
-     * Check if message is a menu request
+     * Check if message is a menu request (strict)
      */
     public function isMenuRequest(string $message): bool
     {
-        $menuKeywords = ['menu', 'accueil', 'retour', 'start', 'bonjour', 'salut', 'hello'];
+        return strtolower(trim($message)) === 'menu';
+    }
+
+    /**
+     * Check if message is a greeting request
+     */
+    public function isGreetingRequest(string $message): bool
+    {
+        $greetingKeywords = ['bonjour', 'salut', 'hello', 'hi', 'hey', 'accueil', 'start'];
         $messageLower = strtolower(trim($message));
 
-        return in_array($messageLower, $menuKeywords);
+        return in_array($messageLower, $greetingKeywords);
     }
 }

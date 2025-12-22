@@ -16,7 +16,7 @@
                 {{ $accounts->count() }} produits</span>
         </div>
 
-        <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
+        <div class="relative overflow-x-auto shadow-md sm:rounded-lg mb-12">
             <table class="w-full text-sm text-left rtl:text-right text-gray-500">
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                     <tr>
@@ -64,6 +64,56 @@
                             </td>
                             <td class="px-6 py-4">
                                 {{ $account->maintenance_fee }}
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Crédits Table -->
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-bold text-gray-900">💳 Nos Crédits</h2>
+            <span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded">Total:
+                {{ $credits->count() }} crédits</span>
+        </div>
+
+        <div class="relative overflow-x-auto shadow-md sm:rounded-lg">
+            <table class="w-full text-sm text-left rtl:text-right text-gray-500">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3">Réf</th>
+                        <th scope="col" class="px-6 py-3">Nom</th>
+                        <th scope="col" class="px-6 py-3">Montant</th>
+                        <th scope="col" class="px-6 py-3">Durée</th>
+                        <th scope="col" class="px-6 py-3">Taux</th>
+                        <th scope="col" class="px-6 py-3">Frais Etude</th>
+                        <th scope="col" class="px-6 py-3">Garantie</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($credits as $credit)
+                        <tr class="bg-white border-b hover:bg-gray-50">
+                            <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                                {{ $credit->reference }}
+                            </td>
+                            <td class="px-6 py-4 font-bold">
+                                {{ $credit->display_name }}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ $credit->amount_range }}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ $credit->duration_range }}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ $credit->interest_rate }}
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ $credit->file_fee }}
+                            </td>
+                            <td class="px-6 py-4 text-xs">
+                                {{ Str::limit($credit->guarantee, 50) }}
                             </td>
                         </tr>
                     @endforeach
