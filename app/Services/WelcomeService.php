@@ -111,8 +111,8 @@ class WelcomeService
             return $this->sendEpargneList($userIdentifier);
         }
 
-        // Sinon, envoyer la réponse avec un bouton "Revenir au Menu"
-        return $this->sendResponseWithMenuButton($userIdentifier, $responseText);
+        // Sinon, envoyer la réponse en texte simple
+        return $this->webhookService->sendWhatsAppMessage($userIdentifier, $responseText);
     }
 
     /**
@@ -214,41 +214,6 @@ class WelcomeService
         return $message;
     }
 
-    /**
-     * Send response with "Revenir au Menu" button
-     */
-    public function sendResponseWithMenuButton(string $userIdentifier, string $message): bool
-    {
-        $message = trim($message);
-
-        if (empty($message)) {
-            $message = "Désolée, je n'ai pas pu générer de réponse précise. Comment puis-je vous aider ?";
-        }
-
-        // WhatsApp interactive messages (buttons) have a 1024 character limit for the body.
-        // If the message is longer, we send it as a plain text message first (limit 4096),
-        // then send a small message with the menu button.
-        if (mb_strlen($message) > 1024) {
-            $this->webhookService->sendWhatsAppMessage($userIdentifier, $message);
-            $message = "Que puis-je faire d'autre pour vous ?";
-        }
-
-        $buttons = [
-            [
-                'type' => 'reply',
-                'reply' => [
-                    'id' => 'btn_menu',
-                    'title' => 'Afficher le Menu'
-                ]
-            ]
-        ];
-
-        return $this->webhookService->sendButtons(
-            $userIdentifier,
-            $message,
-            $buttons
-        );
-    }
 
     /**
      * Get information about IMF Bisou Bisou

@@ -200,7 +200,7 @@ class ChatbotService
      */
     protected function getSystemPrompt(): string
     {
-        $basePrompt = "Tu es Madame Sophie, l’assistante virtuelle officielle de l’IMF Bisou Bisou.\n\n" .
+        $basePrompt = "Tu es Sophie, l’assistante virtuelle officielle de l’IMF Bisou Bisou.\n\n" .
             "TON RÔLE :\n" .
             "Tu es une experte des produits financiers de Bisou Bisou. Ton but est d'aider les clients à comprendre nos offres et à les orienter.\n\n" .
             "RÈGLES STRICTES :\n" .

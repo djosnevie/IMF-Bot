@@ -165,8 +165,8 @@ class WebhookController extends Controller
                     // Clean response from trigger keyword
                     $cleanResponse = str_replace('[TRIGGER_MENU]', '', $aiResponse);
 
-                    // Send response via WhatsApp with a menu button
-                    $sent = $this->welcomeService->sendResponseWithMenuButton(
+                    // Send response via WhatsApp as plain text
+                    $sent = $this->webhookService->sendWhatsAppMessage(
                         $userIdentifier,
                         trim($cleanResponse)
                     );
