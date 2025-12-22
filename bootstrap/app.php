@@ -17,6 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
             '/webhook',
             '/webhook/*',
         ]);
+
+        // Rediriger les utilisateurs non authentifiés vers la page de connexion
+        $middleware->redirectTo(
+            guests: '/login',
+            users: '/admin'
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

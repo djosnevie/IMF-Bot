@@ -7,6 +7,7 @@
     <title>@yield('title') - Dashboard Madame Sophie</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/jpeg" href="{{ asset('favicon.jpg') }}">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -21,8 +22,9 @@
         <!-- Sidebar -->
         <aside class="w-64 bg-slate-900 text-white flex-shrink-0">
             <div class="p-6">
-                <h1 class="text-2xl font-bold flex items-center gap-2">
-                    <span class="text-blue-400">🏦</span> Bisou Bisou
+                <h1 class="text-2xl font-bold flex items-center gap-3">
+                    <img src="{{ asset('favicon.jpg') }}" alt="Logo" class="w-8 h-8 rounded-lg object-cover">
+                    <span class="text-white">Bisou Bisou</span>
                 </h1>
                 <p class="text-xs text-slate-400 mt-1 uppercase tracking-wider font-semibold">Dashboard Chatbot</p>
             </div>
@@ -53,15 +55,32 @@
                     <i class="fas fa-list-ul w-5"></i>
                     <span>Logs Webhook</span>
                 </a>
+                <a href="{{ route('admin.users') }}"
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.users*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800' }}">
+                    <i class="fas fa-users w-5"></i>
+                    <span>Utilisateurs</span>
+                </a>
             </nav>
 
-            <div class="absolute bottom-0 w-64 p-6 border-t border-slate-800">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold">A</div>
-                    <div>
-                        <p class="text-sm font-medium">Admin</p>
-                        <p class="text-xs text-slate-400">Connecté</p>
+            <div class="absolute bottom-0 w-64 p-6 border-t border-slate-800 bg-slate-900">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white">
+                            {{ substr(auth()->user()->name, 0, 1) }}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium truncate">{{ auth()->user()->name }}</p>
+                            <p class="text-xs text-slate-400">Connecté</p>
+                        </div>
                     </div>
+                    <form action="{{ route('logout') }}" method="POST">
+                        @csrf
+                        <button type="submit" class="text-slate-400 hover:text-red-400 transition-colors"
+                            title="Déconnexion">
+                            <i class="fas fa-power-off"></i>
+                        </button>
+                    </form>
                 </div>
             </div>
         </aside>

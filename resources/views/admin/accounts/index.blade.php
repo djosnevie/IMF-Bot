@@ -15,11 +15,17 @@
                     <p class="text-xs text-gray-500">Ces données servent de contexte à l'IA pour répondre aux clients.</p>
                 </div>
             </div>
-            <button
+            <a href="{{ route('admin.accounts.create') }}"
                 class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors">
                 <i class="fas fa-plus mr-2"></i> Nouveau Compte
-            </button>
+            </a>
         </div>
+
+        @if(session('success'))
+            <div class="m-6 p-4 bg-green-50 border border-green-100 text-green-700 rounded-xl text-sm font-medium">
+                {{ session('success') }}
+            </div>
+        @endif
         <div class="overflow-x-auto">
             <table class="w-full text-left">
                 <thead>
@@ -62,10 +68,18 @@
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex justify-end gap-2">
-                                    <button class="p-2 text-gray-400 hover:text-blue-600 transition-colors"><i
-                                            class="fas fa-edit"></i></button>
-                                    <button class="p-2 text-gray-400 hover:text-red-600 transition-colors"><i
-                                            class="fas fa-trash"></i></button>
+                                    <a href="{{ route('admin.accounts.edit', $account->id) }}"
+                                        class="p-2 text-gray-400 hover:text-blue-600 transition-colors"><i
+                                            class="fas fa-edit"></i></a>
+                                    <form action="{{ route('admin.accounts.destroy', $account->id) }}" method="POST"
+                                        onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce compte ?');"
+                                        class="inline">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="p-2 text-gray-400 hover:text-red-600 transition-colors">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
