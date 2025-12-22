@@ -92,6 +92,23 @@ class WebhookController extends Controller
                 'content' => $content
             ]);
 
+            // Check if it's a greeting request
+            if ($messageType === 'text' && $this->welcomeService->isGreetingRequest($content)) {
+                \Log::info('👋 Envoi du message d\'accueil');
+                $sent = $this->welcomeService->sendGreetingMessage($userIdentifier);
+
+                $this->webhookService->logWebhook(
+                    'whatsapp',
+                    $payload,
+                    ['greeting_sent' => $sent],
+                    'success',
+                    null,
+                    $ipAddress
+                );
+
+                return response()->json(['status' => 'ok'], 200);
+            }
+
             // Check if it's a menu request (strict: "Menu")
             if ($messageType === 'text' && $this->welcomeService->isMenuRequest($content)) {
                 \Log::info('🏠 Envoi du menu interactif');

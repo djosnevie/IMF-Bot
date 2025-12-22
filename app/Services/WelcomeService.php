@@ -19,10 +19,9 @@ class WelcomeService
      */
     public function sendGreetingMessage(string $userIdentifier): bool
     {
-        $bodyText = "Bonjour 👋\n" .
-            "Je suis Sophie, l’assistante virtuelle de l’IMF Bisou Bisou.\n" .
-            "Comment puis-je vous aider ?\n\n" .
-            "👉 Tapez *Menu* pour afficher les options.";
+        $bodyText = "Bonjour 👋🏽, je suis Sophie, assistante virtuelle de l’IMF Bisou Bisou.\n\n" .
+            "Comment puis-je vous aider aujourd’hui ?\n\n" .
+            "Je peux vous renseigner sur nos comptes, crédits et services.";
 
         return $this->webhookService->sendWhatsAppMessage($userIdentifier, $bodyText);
     }
@@ -220,12 +219,26 @@ class WelcomeService
      */
     public function sendResponseWithMenuButton(string $userIdentifier, string $message): bool
     {
+        $message = trim($message);
+
+        if (empty($message)) {
+            $message = "Désolée, je n'ai pas pu générer de réponse précise. Comment puis-je vous aider ?";
+        }
+
+        // WhatsApp interactive messages (buttons) have a 1024 character limit for the body.
+        // If the message is longer, we send it as a plain text message first (limit 4096),
+        // then send a small message with the menu button.
+        if (mb_strlen($message) > 1024) {
+            $this->webhookService->sendWhatsAppMessage($userIdentifier, $message);
+            $message = "Que puis-je faire d'autre pour vous ?";
+        }
+
         $buttons = [
             [
                 'type' => 'reply',
                 'reply' => [
                     'id' => 'btn_menu',
-                    'title' => 'Revenir au Menu'
+                    'title' => 'Afficher le Menu'
                 ]
             ]
         ];
