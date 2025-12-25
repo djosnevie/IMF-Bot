@@ -92,6 +92,9 @@ class WebhookController extends Controller
                 'content' => $content
             ]);
 
+            // Activer l'indicateur "en train d'écrire"
+            $this->webhookService->sendTypingIndicator($userIdentifier);
+
             // Check if it's a greeting request
             if ($messageType === 'text' && $this->welcomeService->isGreetingRequest($content)) {
                 \Log::info('👋 Envoi du message d\'accueil');

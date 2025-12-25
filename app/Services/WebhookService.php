@@ -108,6 +108,32 @@ class WebhookService
     }
 
     /**
+     * Send typing indicator (typing_on)
+     */
+    public function sendTypingIndicator(string $to): bool
+    {
+        try {
+            $accessToken = config('chatbot.whatsapp_access_token');
+            $phoneNumberId = config('chatbot.whatsapp_phone_number_id');
+
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'Bearer ' . $accessToken,
+                'Content-Type' => 'application/json',
+            ])->post("https://graph.facebook.com/v18.0/{$phoneNumberId}/messages", [
+                        'messaging_product' => 'whatsapp',
+                        'recipient_type' => 'individual',
+                        'to' => $to,
+                        'sender_action' => 'typing_on'
+                    ]);
+
+            return $response->successful();
+        } catch (\Exception $e) {
+            Log::error('WhatsApp typing indicator error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Send interactive buttons
      */
     public function sendButtons(string $to, string $bodyText, array $buttons, ?string $headerText = null, ?string $footerText = null): bool
