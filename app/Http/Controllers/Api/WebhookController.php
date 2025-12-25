@@ -109,45 +109,6 @@ class WebhookController extends Controller
                 return response()->json(['status' => 'ok'], 200);
             }
 
-            // Check if it's a menu request (strict: "Menu")
-            if ($messageType === 'text' && $this->welcomeService->isMenuRequest($content)) {
-                \Log::info('🏠 Envoi du menu interactif');
-                $sent = $this->welcomeService->sendWelcomeMessage($userIdentifier);
-
-                $this->webhookService->logWebhook(
-                    'whatsapp',
-                    $payload,
-                    ['menu_sent' => $sent],
-                    'success',
-                    null,
-                    $ipAddress
-                );
-
-                return response()->json(['status' => 'ok'], 200);
-            }
-
-            // Check if it's a button click or list selection
-            if ($messageType === 'interactive' && (isset($parsedData['button_id']) || isset($parsedData['list_id']))) {
-                $interactionId = $parsedData['button_id'] ?? $parsedData['list_id'];
-                $interactionType = isset($parsedData['button_id']) ? 'bouton' : 'liste';
-
-                \Log::info("🔘 Interaction $interactionType", ['id' => $interactionId]);
-
-                // Handle interaction (sends message with button/list)
-                $sent = $this->welcomeService->handleButtonClick($interactionId, $userIdentifier);
-
-                $this->webhookService->logWebhook(
-                    'whatsapp',
-                    $payload,
-                    ['response_sent' => $sent, 'interaction_id' => $interactionId],
-                    'success',
-                    null,
-                    $ipAddress
-                );
-
-                return response()->json(['status' => 'ok'], 200);
-            }
-
             // For other text messages, process with AI (Priority 1 for intelligence)
             if ($messageType === 'text' && !empty($content)) {
                 \Log::info('🤖 Traitement avec IA', ['content' => $content]);
@@ -160,27 +121,17 @@ class WebhookController extends Controller
 
                 if ($result['success']) {
                     $aiResponse = $result['response'];
-                    $shouldTriggerMenu = str_contains($aiResponse, '[TRIGGER_MENU]');
-
-                    // Clean response from trigger keyword
-                    $cleanResponse = str_replace('[TRIGGER_MENU]', '', $aiResponse);
 
                     // Send response via WhatsApp as plain text
                     $sent = $this->webhookService->sendWhatsAppMessage(
                         $userIdentifier,
-                        trim($cleanResponse)
+                        trim($aiResponse)
                     );
-
-                    // If AI detected a menu intent, send the interactive menu immediately after
-                    if ($shouldTriggerMenu) {
-                        \Log::info('📋 Déclenchement automatique du menu par l\'IA');
-                        $this->welcomeService->sendWelcomeMessage($userIdentifier);
-                    }
 
                     $this->webhookService->logWebhook(
                         'whatsapp',
                         $payload,
-                        ['ai_response_sent' => $sent, 'menu_triggered' => $shouldTriggerMenu],
+                        ['ai_response_sent' => $sent],
                         'success',
                         null,
                         $ipAddress
