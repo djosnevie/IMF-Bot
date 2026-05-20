@@ -11,6 +11,11 @@ use App\Models\Credit;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\TicketController;
+use App\Http\Controllers\Admin\Crm\ContactController;
+use App\Http\Controllers\Admin\Crm\TagController;
+use App\Http\Controllers\Admin\Crm\CampaignController;
+use App\Http\Controllers\Admin\Crm\AlertController;
+use App\Http\Controllers\Admin\Crm\ReportController;
 
 Route::get('/', function () {
     return redirect()->route('admin.dashboard');
@@ -79,4 +84,49 @@ Route::prefix('admin')->middleware('auth')->group(function () {
         Route::post('/{ticket}/comment', [TicketController::class, 'comment'])->name('comment')->middleware('permission:tickets.comment_internal|tickets.comment_public');
         Route::patch('/{ticket}/status', [TicketController::class, 'updateStatus'])->name('updateStatus')->middleware('permission:tickets.assign');
     });
+
+    // ─── CRM Natif ────────────────────────────────────────────────────────────
+    Route::prefix('crm')->name('admin.crm.')->group(function () {
+
+        // Contacts (admin, supervisor, agent avec scope)
+        Route::middleware('permission:crm.contacts.view')->group(function () {
+            Route::get('/contacts', [ContactController::class, 'index'])->name('contacts.index');
+            Route::get('/contacts/export', [ContactController::class, 'exportCsv'])->name('contacts.export');
+            Route::get('/contacts/{contact}', [ContactController::class, 'show'])->name('contacts.show');
+            Route::post('/contacts/{contact}/stage', [ContactController::class, 'updateStage'])->name('contacts.stage');
+            Route::post('/contacts/{contact}/assign', [ContactController::class, 'assignAgent'])->name('contacts.assign');
+            Route::post('/contacts/{contact}/note', [ContactController::class, 'addNote'])->name('contacts.note');
+        });
+
+        // Tags (admin seulement)
+        Route::middleware('permission:crm.tags.manage')->group(function () {
+            Route::get('/tags', [TagController::class, 'index'])->name('tags.index');
+            Route::post('/tags', [TagController::class, 'store'])->name('tags.store');
+            Route::post('/tags/merge', [TagController::class, 'merge'])->name('tags.merge');
+        });
+
+        // Campagnes (admin, supervisor)
+        Route::middleware('permission:crm.campaigns.manage')->group(function () {
+            Route::get('/campaigns', [CampaignController::class, 'index'])->name('campaigns.index');
+            Route::get('/campaigns/create', [CampaignController::class, 'create'])->name('campaigns.create');
+            Route::post('/campaigns', [CampaignController::class, 'store'])->name('campaigns.store');
+            Route::post('/campaigns/{campaign}/cancel', [CampaignController::class, 'cancel'])->name('campaigns.cancel');
+            Route::get('/campaigns/eligible-count', [CampaignController::class, 'eligibleCount'])->name('campaigns.eligible-count');
+        });
+
+        // Alertes (agent : ses propres alertes uniquement)
+        Route::middleware('permission:crm.alerts.view')->group(function () {
+            Route::get('/alerts', [AlertController::class, 'index'])->name('alerts.index');
+            Route::post('/alerts/{alert}/read', [AlertController::class, 'markRead'])->name('alerts.read');
+            Route::post('/alerts/read-all', [AlertController::class, 'markAllRead'])->name('alerts.read-all');
+            Route::get('/alerts/unread-count', [AlertController::class, 'unreadCount'])->name('alerts.unread-count');
+        });
+
+        // Rapports (admin, supervisor)
+        Route::middleware('permission:crm.reports.view')->group(function () {
+            Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+            Route::get('/reports/export', [ReportController::class, 'exportCsv'])->name('reports.export');
+        });
+    });
+    // ─────────────────────────────────────────────────────────────────────────
 });

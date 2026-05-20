@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Jobs\CrmEnrichmentJob;
+use App\Services\CrmService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -79,12 +81,28 @@ class ChatbotService
                 $aiResponse['metadata']
             );
 
-            // Update conversation last message time
+            // Mise à jour du timestamp de la conversation
             $conversation->update(['last_message_at' => now()]);
 
+            // ─── Enrichissement CRM (non-bloquant) ────────────────────────────
+            // Dispatché en job asynchrone pour ne pas allonger le temps de
+            // réponse perçu par le client WhatsApp.
+            try {
+                $crmService = app(CrmService::class);
+                $contact = $crmService->findOrCreateContact($userIdentifier);
+                CrmEnrichmentJob::dispatch($contact->id, $messageContent, $responseContent)
+                    ->onQueue('default');
+            } catch (\Exception $e) {
+                // Silencieux : une erreur CRM ne doit JAMAIS interrompre la conversation
+                Log::warning('[ChatbotService] Erreur dispatch CRM (ignorée)', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            // ─────────────────────────────────────────────────────────────────
+
             return [
-                'success' => true,
-                'response' => $responseContent,
+                'success'         => true,
+                'response'        => $responseContent,
                 'conversation_id' => $conversation->id,
             ];
         } catch (\Exception $e) {
