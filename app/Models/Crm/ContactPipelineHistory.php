@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ContactPipelineHistory extends Model
 {
+    protected $table = 'contact_pipeline_history';
+
     protected $fillable = [
         'contact_id', 'from_stage_id', 'to_stage_id', 'changed_by', 'reason',
     ];

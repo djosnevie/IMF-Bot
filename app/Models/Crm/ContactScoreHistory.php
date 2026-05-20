@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ContactScoreHistory extends Model
 {
+    protected $table = 'contact_score_history';
+
     protected $fillable = [
         'contact_id', 'score', 'delta', 'reason',
     ];
