@@ -217,6 +217,7 @@ document.querySelectorAll('input[name="criteria_min_score"], input[name="criteri
     .forEach(el => el.addEventListener('input', refreshEligibleCount));
 
 updatePreview();
+refreshEligibleCount();
 </script>
 @endpush
 @endsection
