@@ -81,10 +81,17 @@
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
                                         <div
-                                            class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs">
+                                            class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-xs">
                                             <i class="fas fa-user"></i>
                                         </div>
-                                        <span class="text-sm font-medium text-gray-900">{{ $conv->user_identifier }}</span>
+                                        <div>
+                                            @if($conv->contact && $conv->contact->display_name)
+                                                <p class="text-sm font-semibold text-gray-900">{{ $conv->contact->display_name }}</p>
+                                                <p class="text-[10px] text-gray-400">{{ $conv->user_identifier }}</p>
+                                            @else
+                                                <p class="text-sm font-medium text-gray-900">{{ $conv->user_identifier }}</p>
+                                            @endif
+                                        </div>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">

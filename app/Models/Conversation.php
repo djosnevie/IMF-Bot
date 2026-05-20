@@ -40,6 +40,12 @@ class Conversation extends Model
         return $this->hasMany(Message::class);
     }
 
+    /** Contact CRM correspondant à cette conversation. */
+    public function contact()
+    {
+        return $this->belongsTo(\App\Models\Crm\Contact::class, 'user_identifier', 'whatsapp_number');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

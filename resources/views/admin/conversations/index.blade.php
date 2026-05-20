@@ -36,8 +36,13 @@
                                         {{ substr($conv->user_identifier, -4) }}
                                     </div>
                                     <div>
-                                        <p class="text-sm font-bold text-gray-900">{{ $conv->user_identifier }}</p>
-                                        <p class="text-xs text-gray-400">ID: #{{ $conv->id }}</p>
+                                        @if($conv->contact && $conv->contact->display_name)
+                                            <p class="text-sm font-bold text-gray-900">{{ $conv->contact->display_name }}</p>
+                                            <p class="text-xs text-gray-400">{{ $conv->user_identifier }} · ID: #{{ $conv->id }}</p>
+                                        @else
+                                            <p class="text-sm font-bold text-gray-900">{{ $conv->user_identifier }}</p>
+                                            <p class="text-xs text-gray-400">ID: #{{ $conv->id }}</p>
+                                        @endif
                                     </div>
                                 </div>
                             </td>

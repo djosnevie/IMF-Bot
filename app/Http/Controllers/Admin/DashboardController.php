@@ -27,7 +27,7 @@ class DashboardController extends Controller
                 ->count(),
         ];
 
-        $recentConversations = Conversation::with('messages')
+        $recentConversations = Conversation::with(['messages', 'contact'])
             ->orderBy('last_message_at', 'desc')
             ->limit(5)
             ->get();
@@ -37,7 +37,7 @@ class DashboardController extends Controller
 
     public function conversations(Request $request)
     {
-        $query = Conversation::withCount('messages')
+        $query = Conversation::with(['contact'])->withCount('messages')
             ->orderBy('last_message_at', 'desc');
 
         // Filtrage par scope : si l'utilisateur ne peut pas tout voir,
@@ -56,6 +56,7 @@ class DashboardController extends Controller
     public function showConversation($id)
     {
         $conversation = Conversation::with([
+            'contact',
             'messages' => function ($query) {
                 $query->orderBy('created_at', 'asc');
             }

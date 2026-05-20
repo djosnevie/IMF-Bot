@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Conversation — ' . $conversation->user_identifier)
+@section('title', 'Conversation — ' . ($conversation->contact?->display_name ?? $conversation->user_identifier))
 @section('page_title', 'Détails de la Conversation')
 
 @section('content')
@@ -12,7 +12,7 @@
     </a>
     <div class="flex gap-2 flex-wrap">
         <span class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold tracking-wide">
-            <i class="fas fa-hashtag mr-1"></i>{{ $conversation->user_identifier }}
+            <i class="fas fa-hashtag mr-1"></i>{{ $conversation->contact?->display_name ?? $conversation->user_identifier }}
         </span>
         <span class="px-3 py-1 rounded-full text-xs font-semibold tracking-wide
             {{ $conversation->status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' }}">
@@ -36,13 +36,20 @@
         {{-- Header style WhatsApp --}}
         <div class="flex items-center gap-3 px-5 py-3 border-b" style="background: #075e54;">
             <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                {{ strtoupper(substr($conversation->user_identifier, -2)) }}
+                {{ strtoupper(substr($conversation->contact?->display_name ?? $conversation->user_identifier, -2)) }}
             </div>
             <div class="flex-1 min-w-0">
-                <p class="font-semibold text-white text-sm truncate">{{ $conversation->user_identifier }}</p>
-                <p class="text-[11px] text-green-200">
-                    Dernière activité : {{ $conversation->last_message_at?->diffForHumans() ?? '—' }}
-                </p>
+                @if($conversation->contact && $conversation->contact->display_name)
+                    <p class="font-semibold text-white text-sm truncate">{{ $conversation->contact->display_name }}</p>
+                    <p class="text-[11px] text-green-200 opacity-90">
+                        {{ $conversation->user_identifier }} · Actif : {{ $conversation->last_message_at?->diffForHumans() ?? '—' }}
+                    </p>
+                @else
+                    <p class="font-semibold text-white text-sm truncate">{{ $conversation->user_identifier }}</p>
+                    <p class="text-[11px] text-green-200">
+                        Dernière activité : {{ $conversation->last_message_at?->diffForHumans() ?? '—' }}
+                    </p>
+                @endif
             </div>
             <div class="flex items-center gap-3 text-white/60">
                 <i class="fas fa-search text-sm"></i>
