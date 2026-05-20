@@ -204,4 +204,32 @@ class ContactController extends Controller
             fclose($handle);
         }, 'contacts_crm_' . now()->format('Ymd') . '.csv');
     }
+
+    /**
+     * Enregistre ou met à jour les informations d'un contact (Nom, Langue, Agent).
+     *
+     * @param Request $request Requête avec champs display_name, detected_language, assigned_to
+     * @param Contact $contact Contact à mettre à jour
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function update(Request $request, Contact $contact)
+    {
+        // Scope agent
+        if (! auth()->user()->hasAnyRole(['super-admin', 'admin', 'supervisor'])) {
+            if ($contact->assigned_to !== auth()->id()) {
+                abort(403, 'Vous n\'êtes pas autorisé à modifier ce contact.');
+            }
+        }
+
+        $data = $request->validate([
+            'display_name'      => 'nullable|string|max:255',
+            'detected_language' => 'sometimes|required|string|in:fr,en,sw',
+            'assigned_to'       => 'nullable|exists:users,id',
+        ]);
+
+        $contact->update($data);
+
+        return back()->with('success', 'Fiche contact mise à jour avec succès.');
+    }
 }

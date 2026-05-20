@@ -93,6 +93,7 @@ Route::prefix('admin')->middleware('auth')->group(function () {
             Route::get('/contacts', [ContactController::class, 'index'])->name('contacts.index');
             Route::get('/contacts/export', [ContactController::class, 'exportCsv'])->name('contacts.export');
             Route::get('/contacts/{contact}', [ContactController::class, 'show'])->name('contacts.show');
+            Route::post('/contacts/{contact}/update', [ContactController::class, 'update'])->name('contacts.update');
             Route::post('/contacts/{contact}/stage', [ContactController::class, 'updateStage'])->name('contacts.stage');
             Route::post('/contacts/{contact}/assign', [ContactController::class, 'assignAgent'])->name('contacts.assign');
             Route::post('/contacts/{contact}/note', [ContactController::class, 'addNote'])->name('contacts.note');

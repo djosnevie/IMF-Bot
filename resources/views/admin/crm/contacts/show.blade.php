@@ -36,19 +36,68 @@
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div class="h-2" style="background: linear-gradient(to right, #3B82F6, #6366F1)"></div>
             <div class="p-5">
-                <div class="flex items-center gap-4 mb-4">
-                    <div class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
-                        {{ strtoupper(substr($contact->whatsapp_number, -2)) }}
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                            {{ strtoupper(substr($contact->whatsapp_number, -2)) }}
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-900 text-lg">{{ $contact->display_name ?? $contact->whatsapp_number }}</h3>
+                            @if($contact->display_name)
+                                <p class="text-sm text-gray-500 flex items-center gap-1"><i class="fab fa-whatsapp text-green-500"></i> {{ $contact->whatsapp_number }}</p>
+                            @endif
+                            <p class="text-xs text-gray-400 mt-1">Langue : <span class="font-semibold">{{ strtoupper($contact->detected_language ?? 'fr') }}</span></p>
+                            <p class="text-xs text-gray-500 mt-0.5">Agent : <span class="font-semibold text-indigo-600">{{ $contact->agent?->name ?? 'Non assigné' }}</span></p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 class="font-bold text-gray-900 text-lg">{{ $contact->display_name ?? $contact->whatsapp_number }}</h3>
-                        @if($contact->display_name)
-                            <p class="text-sm text-gray-500 flex items-center gap-1"><i class="fab fa-whatsapp text-green-500"></i> {{ $contact->whatsapp_number }}</p>
-                        @endif
-                        <p class="text-xs text-gray-400 mt-1">Langue : {{ strtoupper($contact->detected_language ?? 'fr') }}</p>
-                    </div>
+                    <button onclick="toggleEditContact()" class="p-2 bg-gray-50 hover:bg-gray-100 text-gray-500 hover:text-gray-800 rounded-xl transition-colors" title="Modifier/Enregistrer le contact">
+                        <i class="fas fa-edit"></i>
+                    </button>
                 </div>
-                <div class="grid grid-cols-2 gap-3 text-sm">
+
+                {{-- Formulaire d'édition (caché par défaut) --}}
+                <form id="edit-contact-form" action="{{ route('admin.crm.contacts.update', $contact->uuid) }}" method="POST" class="hidden border-t border-gray-100 pt-4 mt-4 space-y-3">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Nom complet / Affichage</label>
+                        <input type="text" name="display_name" value="{{ old('display_name', $contact->display_name) }}"
+                               class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                               placeholder="Ex: Jean Dupont">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Langue</label>
+                            <select name="detected_language" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="fr" {{ $contact->detected_language === 'fr' ? 'selected' : '' }}>Français</option>
+                                <option value="en" {{ $contact->detected_language === 'en' ? 'selected' : '' }}>English</option>
+                                <option value="sw" {{ $contact->detected_language === 'sw' ? 'selected' : '' }}>Swahili</option>
+                            </select>
+                        </div>
+                        @if(auth()->user()->hasAnyRole(['super-admin','admin','supervisor']))
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Agent assigné</label>
+                            <select name="assigned_to" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="">Non assigné</option>
+                                @foreach($agents as $agent)
+                                    <option value="{{ $agent->id }}" {{ $contact->assigned_to == $agent->id ? 'selected' : '' }}>{{ $agent->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @else
+                        <input type="hidden" name="assigned_to" value="{{ $contact->assigned_to }}">
+                        @endif
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors">
+                            Enregistrer
+                        </button>
+                        <button type="button" onclick="toggleEditContact()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-xs font-medium transition-colors">
+                            Annuler
+                        </button>
+                    </div>
+                </form>
+
+                <div class="grid grid-cols-2 gap-3 text-sm mt-4">
                     <div class="bg-gray-50 rounded-xl p-3">
                         <p class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">1ère interaction</p>
                         <p class="font-semibold text-gray-700 mt-1">{{ $contact->first_contact_at?->format('d/m/Y') ?? '—' }}</p>
@@ -60,6 +109,7 @@
                 </div>
             </div>
         </div>
+
 
         {{-- Score + sparkline --}}
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
@@ -240,3 +290,14 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    function toggleEditContact() {
+        const form = document.getElementById('edit-contact-form');
+        if (form) {
+            form.classList.toggle('hidden');
+        }
+    }
+</script>
+@endpush

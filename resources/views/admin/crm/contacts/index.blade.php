@@ -116,7 +116,14 @@
                                 {{ strtoupper(substr($contact->whatsapp_number, -2)) }}
                             </div>
                             <div>
-                                <p class="font-semibold text-gray-800 text-sm">{{ $contact->display_name ?? $contact->whatsapp_number }}</p>
+                                <div class="flex items-center gap-2">
+                                    <p class="font-semibold text-gray-800 text-sm">{{ $contact->display_name ?? $contact->whatsapp_number }}</p>
+                                    @if(!$contact->display_name)
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 flex items-center gap-1">
+                                            <i class="fas fa-user-plus text-[9px]"></i> Nouveau
+                                        </span>
+                                    @endif
+                                </div>
                                 @if($contact->display_name)
                                     <p class="text-xs text-gray-400">{{ $contact->whatsapp_number }}</p>
                                 @endif
@@ -157,10 +164,18 @@
                         {{ $contact->agent?->name ?? '—' }}
                     </td>
                     <td class="px-5 py-4">
-                        <a href="{{ route('admin.crm.contacts.show', $contact->uuid) }}"
-                           class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                            <i class="fas fa-eye"></i> Voir
-                        </a>
+                        <div class="flex items-center gap-3">
+                            <a href="{{ route('admin.crm.contacts.show', $contact->uuid) }}"
+                               class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold flex items-center gap-1">
+                                <i class="fas fa-eye"></i> Voir
+                            </a>
+                            @if(!$contact->display_name)
+                                <button type="button" onclick="openQuickRegisterModal('{{ $contact->uuid }}', '{{ $contact->whatsapp_number }}')"
+                                        class="text-emerald-600 hover:text-emerald-800 text-xs font-semibold flex items-center gap-1 border border-emerald-200 hover:border-emerald-300 bg-emerald-50 px-2 py-1 rounded-lg transition-all">
+                                    <i class="fas fa-user-plus"></i> Enregistrer
+                                </button>
+                            @endif
+                        </div>
                     </td>
                 </tr>
                 @empty
@@ -178,4 +193,82 @@
         <div class="p-5 border-t border-gray-100">{{ $contacts->links() }}</div>
     @endif
 </div>
+
+{{-- Modal Enregistrement Rapide --}}
+<div id="quick-register-modal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+    {{-- Backdrop --}}
+    <div class="fixed inset-0 bg-gray-900 bg-opacity-50 transition-opacity"></div>
+
+    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+        <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-gray-100">
+            <div class="absolute right-4 top-4">
+                <button type="button" onclick="closeQuickRegisterModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="quick-register-form" action="" method="POST">
+                @csrf
+                <div class="bg-white px-6 pb-6 pt-8">
+                    <div class="mb-4 text-center">
+                        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-3">
+                            <i class="fas fa-user-plus text-lg"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900">Enregistrer ce numéro</h3>
+                        <p class="text-xs text-gray-500 mt-1">Donnez un nom complet à ce contact pour l'identifier dans le CRM.</p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Numéro WhatsApp</label>
+                            <input type="text" id="quick-whatsapp-display" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm text-gray-500 outline-none cursor-not-allowed" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Nom complet / Affichage <span class="text-red-500">*</span></label>
+                            <input type="text" name="display_name" required autofocus
+                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none animate-pulse-once"
+                                   placeholder="Ex: Jean Dupont">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-50 px-6 py-4 flex gap-3 justify-end rounded-b-2xl">
+                    <button type="button" onclick="closeQuickRegisterModal()"
+                            class="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-sm font-medium transition-colors">
+                        Annuler
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-colors">
+                        Enregistrer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+    function openQuickRegisterModal(uuid, whatsappNumber) {
+        const modal = document.getElementById('quick-register-modal');
+        const form = document.getElementById('quick-register-form');
+        const inputDisplay = document.getElementById('quick-whatsapp-display');
+        
+        if (modal && form && inputDisplay) {
+            // Dynamically set action URL
+            form.action = `/admin/crm/contacts/${uuid}/update`;
+            inputDisplay.value = whatsappNumber;
+            
+            modal.classList.remove('hidden');
+        }
+    }
+    
+    function closeQuickRegisterModal() {
+        const modal = document.getElementById('quick-register-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+</script>
+@endpush
