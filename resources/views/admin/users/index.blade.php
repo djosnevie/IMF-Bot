@@ -7,10 +7,12 @@
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
             <h3 class="font-bold text-gray-800">Utilisateurs du Dashboard</h3>
+            @can('users.manage')
             <a href="{{ route('admin.users.create') }}"
                 class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors">
                 <i class="fas fa-user-plus mr-2"></i> Nouvel Utilisateur
             </a>
+            @endcan
         </div>
 
         @if(session('success'))
@@ -48,17 +50,22 @@
                                 {{ $user->created_at->format('d/m/Y') }}
                             </td>
                             <td class="px-6 py-4 text-right">
-                                @if($user->id !== auth()->id())
-                                    <form action="{{ route('admin.users.destroy', $user->id) }}" method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?');" class="inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="text-red-400 hover:text-red-600 transition-colors" title="Supprimer">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </form>
-                                @else
-                                    <span class="text-xs text-gray-400 italic">C'est vous</span>
-                                @endif
+                                @can('users.manage')
+                                    <a href="{{ route('admin.users.edit', $user->uuid) }}" class="text-blue-500 hover:text-blue-700 transition-colors mr-3" title="Gérer Rôles & Permissions">
+                                        <i class="fas fa-user-shield"></i>
+                                    </a>
+                                    @if($user->id !== auth()->id())
+                                        <form action="{{ route('admin.users.destroy', $user->uuid) }}" method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?');" class="inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-red-400 hover:text-red-600 transition-colors" title="Supprimer">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    @else
+                                        <span class="text-xs text-gray-400 italic">C'est vous</span>
+                                    @endif
+                                @endcan
                             </td>
                         </tr>
                     @endforeach

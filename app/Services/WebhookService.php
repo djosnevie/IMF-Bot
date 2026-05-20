@@ -100,9 +100,15 @@ class WebhookService
                         ]
                     ]);
 
+            if (!$response->successful()) {
+                Log::error('❌ WhatsApp send message API error: ' . $response->body());
+            } else {
+                Log::info('✅ WhatsApp message sent successfully to ' . $to);
+            }
+
             return $response->successful();
         } catch (\Exception $e) {
-            Log::error('WhatsApp send message error: ' . $e->getMessage());
+            Log::error('WhatsApp send message exception: ' . $e->getMessage());
             return false;
         }
     }
@@ -110,7 +116,7 @@ class WebhookService
     /**
      * Send typing indicator (typing_on)
      */
-    public function sendTypingIndicator(string $to): bool
+    public function sendTypingIndicator(string $messageId): bool
     {
         try {
             $accessToken = config('chatbot.whatsapp_access_token');
@@ -121,16 +127,81 @@ class WebhookService
                 'Content-Type' => 'application/json',
             ])->post("https://graph.facebook.com/v18.0/{$phoneNumberId}/messages", [
                         'messaging_product' => 'whatsapp',
-                        'recipient_type' => 'individual',
-                        'to' => $to,
-                        'sender_action' => 'typing_on'
+                        'status' => 'read',
+                        'message_id' => $messageId,
+                        'typing_indicator' => [
+                            'type' => 'text'
+                        ]
                     ]);
+
+            if (!$response->successful()) {
+                Log::error('❌ WhatsApp typing indicator API error: ' . $response->body());
+            }
 
             return $response->successful();
         } catch (\Exception $e) {
-            Log::error('WhatsApp typing indicator error: ' . $e->getMessage());
+            Log::error('WhatsApp typing indicator exception: ' . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Simuler un délai de frappe humain avant l'envoi d'une réponse.
+     *
+     * Active l'indicateur "en train d'écrire" puis attend un délai proportionnel
+     * à la longueur du message pour donner l'impression qu'un humain rédige la réponse.
+     * L'indicateur reste actif pendant 25 secondes ou jusqu'à l'envoi du message.
+     *
+     * @param string $messageId L'ID du message entrant auquel on répond
+     * @param string $message   Le message qui sera envoyé (pour calculer le délai)
+     *
+     * @return void
+     */
+    public function simulateTyping(string $messageId, string $message): void
+    {
+        // Calculer le délai en fonction de la longueur du message
+        $length = mb_strlen($message);
+        $delay = $this->calculateTypingDelay($length);
+
+        // Envoyer l'indicateur de frappe (qui marque aussi le message comme lu)
+        $this->sendTypingIndicator($messageId);
+
+        Log::info('⌨️ Simulation de frappe', [
+            'message_id' => $messageId,
+            'message_length' => $length,
+            'delay_seconds' => $delay,
+        ]);
+
+        // Attendre le délai calculé (l'indicateur reste actif côté client)
+        sleep($delay);
+    }
+
+    /**
+     * Calculer le délai de frappe en secondes selon la longueur du message.
+     *
+     * @param int $length Nombre de caractères du message
+     *
+     * @return int Délai en secondes (entre 1 et 5)
+     */
+    private function calculateTypingDelay(int $length): int
+    {
+        if ($length < 20) {
+            return 1;  // "OK", "Merci", "Bonjour" → quasi-instantané
+        }
+
+        if ($length < 100) {
+            return 2;  // Réponse courte
+        }
+
+        if ($length < 300) {
+            return 3;  // Réponse moyenne
+        }
+
+        if ($length < 500) {
+            return 4;  // Réponse longue
+        }
+
+        return 5;      // Réponse très longue
     }
 
     /**

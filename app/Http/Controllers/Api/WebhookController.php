@@ -92,12 +92,14 @@ class WebhookController extends Controller
                 'content' => $content
             ]);
 
-            // Activer l'indicateur "en train d'écrire"
-            $this->webhookService->sendTypingIndicator($userIdentifier);
-
             // Check if it's a greeting request
             if ($messageType === 'text' && $this->welcomeService->isGreetingRequest($content)) {
                 \Log::info('👋 Envoi du message d\'accueil');
+
+                // Simuler la frappe avant le message d'accueil
+                $greetingText = "Bonjour 👋🏽, je suis Sophie, assistante virtuelle de l'IMF Bisou Bisou.\n\nComment puis-je vous aider aujourd'hui ?\n\nJe peux vous renseigner sur nos comptes, crédits et services.";
+                $this->webhookService->simulateTyping($parsedData['message_id'], $greetingText);
+
                 $sent = $this->welcomeService->sendGreetingMessage($userIdentifier);
 
                 $this->webhookService->logWebhook(
@@ -125,6 +127,9 @@ class WebhookController extends Controller
                 if ($result['success']) {
                     $aiResponse = $result['response'];
 
+                    // Simuler la frappe humaine avant d'envoyer la réponse
+                    $this->webhookService->simulateTyping($parsedData['message_id'], $aiResponse);
+
                     // Send response via WhatsApp as plain text
                     $sent = $this->webhookService->sendWhatsAppMessage(
                         $userIdentifier,
@@ -140,6 +145,21 @@ class WebhookController extends Controller
                         $ipAddress
                     );
 
+                    return response()->json(['status' => 'ok'], 200);
+                } else {
+                    $errorResponse = $result['response'];
+                    $this->webhookService->simulateTyping($parsedData['message_id'], $errorResponse);
+                    $this->webhookService->sendWhatsAppMessage($userIdentifier, trim($errorResponse));
+                    
+                    $this->webhookService->logWebhook(
+                        'whatsapp',
+                        $payload,
+                        null,
+                        'failed',
+                        $result['error'] ?? 'Unknown error',
+                        $ipAddress
+                    );
+                    
                     return response()->json(['status' => 'ok'], 200);
                 }
             }

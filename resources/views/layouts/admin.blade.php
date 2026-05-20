@@ -35,11 +35,14 @@
                     <i class="fas fa-chart-pie w-5"></i>
                     <span>Vue d'ensemble</span>
                 </a>
+                @canany(['conversations.view_all', 'conversations.view_assigned'])
                 <a href="{{ route('admin.conversations') }}"
                     class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.conversations*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800' }}">
                     <i class="fas fa-comments w-5"></i>
                     <span>Conversations</span>
                 </a>
+                @endcanany
+                @can('products.manage')
                 <a href="{{ route('admin.accounts') }}"
                     class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.accounts*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800' }}">
                     <i class="fas fa-university w-5"></i>
@@ -50,16 +53,28 @@
                     <i class="fas fa-hand-holding-usd w-5"></i>
                     <span>Crédits & Prêts</span>
                 </a>
+                @endcan
+                @canany(['tickets.view_all', 'tickets.view_assigned'])
+                <a href="{{ route('admin.tickets.index') }}"
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.tickets*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800' }}">
+                    <i class="fas fa-ticket-alt w-5"></i>
+                    <span>Tickets & Plaintes</span>
+                </a>
+                @endcanany
+                @can('logs.view')
                 <a href="{{ route('admin.logs') }}"
                     class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.logs*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800' }}">
                     <i class="fas fa-list-ul w-5"></i>
                     <span>Logs Webhook</span>
                 </a>
+                @endcan
+                @can('users.view')
                 <a href="{{ route('admin.users') }}"
                     class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.users*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800' }}">
                     <i class="fas fa-users w-5"></i>
                     <span>Utilisateurs</span>
                 </a>
+                @endcan
             </nav>
 
             <div class="absolute bottom-0 w-64 p-6 border-t border-slate-800 bg-slate-900">

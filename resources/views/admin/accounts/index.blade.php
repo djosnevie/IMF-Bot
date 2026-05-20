@@ -68,10 +68,10 @@
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex justify-end gap-2">
-                                    <a href="{{ route('admin.accounts.edit', $account->id) }}"
+                                    <a href="{{ route('admin.accounts.edit', $account->uuid) }}"
                                         class="p-2 text-gray-400 hover:text-blue-600 transition-colors"><i
                                             class="fas fa-edit"></i></a>
-                                    <form action="{{ route('admin.accounts.destroy', $account->id) }}" method="POST"
+                                    <form action="{{ route('admin.accounts.destroy', $account->uuid) }}" method="POST"
                                         onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce compte ?');"
                                         class="inline">
                                         @csrf

@@ -64,10 +64,10 @@
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex justify-end gap-2">
-                                    <a href="{{ route('admin.credits.edit', $credit->id) }}"
+                                    <a href="{{ route('admin.credits.edit', $credit->uuid) }}"
                                         class="p-2 text-gray-400 hover:text-blue-600 transition-colors"><i
                                             class="fas fa-edit"></i></a>
-                                    <form action="{{ route('admin.credits.destroy', $credit->id) }}" method="POST"
+                                    <form action="{{ route('admin.credits.destroy', $credit->uuid) }}" method="POST"
                                         onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce crédit ?');"
                                         class="inline">
                                         @csrf

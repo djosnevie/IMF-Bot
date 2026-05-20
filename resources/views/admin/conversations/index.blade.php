@@ -60,7 +60,7 @@
                                 {{ $conv->last_message_at ? $conv->last_message_at->diffForHumans() : 'Jamais' }}
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <a href="{{ route('admin.conversations.show', $conv->id) }}"
+                                <a href="{{ route('admin.conversations.show', $conv->uuid) }}"
                                     class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                     <i class="fas fa-eye text-blue-500"></i>
                                     Voir

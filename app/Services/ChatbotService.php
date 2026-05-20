@@ -10,7 +10,15 @@ use Illuminate\Support\Facades\Log;
 class ChatbotService
 {
     /**
-     * Process incoming message from user
+     * Traiter un message entrant d'un utilisateur.
+     *
+     * Vérifie d'abord si un flux de plainte est en cours, sinon passe par l'IA.
+     *
+     * @param string $userIdentifier  Numéro WhatsApp de l'utilisateur
+     * @param string $messageContent  Contenu du message reçu
+     * @param string $platform        Plateforme d'origine (whatsapp par défaut)
+     *
+     * @return array Résultat du traitement avec clés success, response, conversation_id
      */
     public function processMessage(string $userIdentifier, string $messageContent, string $platform = 'whatsapp')
     {
@@ -21,14 +29,53 @@ class ChatbotService
             // Save user message
             $userMessage = $this->saveMessage($conversation->id, 'user', $messageContent);
 
-            // Generate AI response
+            // 1. Vérifier si un flux de plainte est en cours
+            $complaintFlow = $conversation->metadata['complaint_flow'] ?? null;
+
+            if ($complaintFlow) {
+                $botResponse = $this->handleComplaintFlow($conversation, $messageContent, $complaintFlow);
+
+                // Sauvegarder la réponse du bot
+                $this->saveMessage($conversation->id, 'bot', $botResponse);
+
+                // Mettre à jour le timestamp
+                $conversation->update(['last_message_at' => now()]);
+
+                return [
+                    'success' => true,
+                    'response' => $botResponse,
+                    'conversation_id' => $conversation->id,
+                ];
+            }
+
+            // 2. Sinon : flux normal → appel IA
             $aiResponse = $this->generateAIResponse($conversation, $messageContent);
+
+            $responseContent = $aiResponse['content'];
+
+            // 3. Détecter le marqueur de déclenchement de plainte dans la réponse IA
+            if (str_contains($responseContent, '[INITIATE_COMPLAINT_FLOW]')) {
+                // Nettoyer le marqueur de la réponse visible
+                $responseContent = trim(str_replace('[INITIATE_COMPLAINT_FLOW]', '', $responseContent));
+
+                // Initialiser le flux de plainte dans la metadata
+                $metadata = $conversation->metadata ?? [];
+                $metadata['complaint_flow'] = [
+                    'step' => 'awaiting_subject',
+                    'subject' => null,
+                    'description' => null,
+                ];
+                $conversation->update(['metadata' => $metadata]);
+
+                // Ajouter la question sur le sujet après la réponse empathique
+                $responseContent .= "\n\nQuel est le sujet de votre plainte ? (Ex : problème de remboursement, erreur sur mon compte, etc.)";
+            }
 
             // Save bot message
             $botMessage = $this->saveMessage(
                 $conversation->id,
                 'bot',
-                $aiResponse['content'],
+                $responseContent,
                 $aiResponse['metadata']
             );
 
@@ -37,7 +84,7 @@ class ChatbotService
 
             return [
                 'success' => true,
-                'response' => $aiResponse['content'],
+                'response' => $responseContent,
                 'conversation_id' => $conversation->id,
             ];
         } catch (\Exception $e) {
@@ -48,6 +95,72 @@ class ChatbotService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Gérer le flux conversationnel de collecte d'une plainte.
+     *
+     * Gère les étapes successives : collecte du sujet, puis de la description,
+     * puis création du ticket via le ComplaintService.
+     *
+     * @param Conversation $conversation  La conversation en cours
+     * @param string       $userMessage   Le message envoyé par l'utilisateur
+     * @param array        $flow          L'état actuel du flux (depuis metadata)
+     *
+     * @return string La réponse à envoyer à l'utilisateur
+     */
+    private function handleComplaintFlow(Conversation $conversation, string $userMessage, array $flow): string
+    {
+        $step = $flow['step'];
+
+        if ($step === 'awaiting_subject') {
+            // Stocker le sujet, passer à l'étape suivante
+            $metadata = $conversation->metadata;
+            $metadata['complaint_flow']['subject'] = $userMessage;
+            $metadata['complaint_flow']['step'] = 'awaiting_description';
+            $conversation->update(['metadata' => $metadata]);
+
+            return "Merci. Pouvez-vous maintenant décrire votre problème en détail ? Plus vous êtes précis(e), plus nous pourrons vous aider rapidement.";
+        }
+
+        if ($step === 'awaiting_description') {
+            $subject = $flow['subject'];
+            $description = $userMessage;
+
+            try {
+                // Créer la plainte et le ticket
+                $complaintService = app(ComplaintService::class);
+                $ticket = $complaintService->createFromConversation(
+                    $conversation,
+                    $subject,
+                    $description,
+                    $complaintService->detectCategory($subject, $description)
+                );
+
+                // Nettoyer le flux de la metadata
+                $metadata = $conversation->metadata;
+                unset($metadata['complaint_flow']);
+                $conversation->update(['metadata' => $metadata]);
+
+                return "Votre plainte a bien été enregistrée. 📋\n\nRéférence : *{$ticket->reference}*\n\nNotre équipe va examiner votre demande et vous contactera dans les plus brefs délais. Puis-je vous aider avec autre chose ?";
+            } catch (\Exception $e) {
+                Log::error('Erreur lors de la création de la plainte : ' . $e->getMessage());
+
+                // Nettoyer le flux en cas d'erreur
+                $metadata = $conversation->metadata;
+                unset($metadata['complaint_flow']);
+                $conversation->update(['metadata' => $metadata]);
+
+                return "Je suis désolée, une erreur est survenue lors de l'enregistrement de votre plainte. Veuillez réessayer ou contacter directement notre agence au 218, Avenue Colonel Ebeya Gombe, Kinshasa-RDC.";
+            }
+        }
+
+        // Cas inattendu : nettoyer le flux
+        $metadata = $conversation->metadata;
+        unset($metadata['complaint_flow']);
+        $conversation->update(['metadata' => $metadata]);
+
+        return "Je suis désolée, une erreur est survenue. Pouvez-vous reformuler votre demande ?";
     }
 
     /**
@@ -200,14 +313,14 @@ class ChatbotService
      */
     protected function getSystemPrompt(): string
     {
-        $basePrompt = "Tu es Sophie, l’assistante virtuelle officielle de l’IMF Bisou Bisou.\n\n" .
+        $basePrompt = "Tu es Sophie, l'assistante virtuelle officielle de l'IMF Bisou Bisou.\n\n" .
             "TON RÔLE :\n" .
             "Tu es une experte des produits financiers de Bisou Bisou. Ton but est d'aider les clients à comprendre nos offres et à les orienter.\n\n" .
             "INFORMATIONS GÉNÉRALES :\n" .
             "- Adresse de l'institution (Microfinance) : 218, Avenue Colonel Ebeya Gombe, Kinshasa-RDC.\n\n" .
             "RÈGLES STRICTES :\n" .
             "- Tu fournis uniquement des informations à titre informatif.\n" .
-            "- Tu n’inventes jamais de produits, taux, montants, conditions ou adresses.\n" .
+            "- Tu n'inventes jamais de produits, taux, montants, conditions ou adresses.\n" .
             "- Tu utilises exclusivement les informations fournies dans le CONTEXTE DES PRODUITS ci-dessous, ou dans les INFORMATIONS GÉNÉRALES.\n" .
             "- Tu ne donnes aucun conseil financier personnalisé.\n" .
             "- Tu ne demandes aucune donnée personnelle (numéro de compte, mot de passe, etc.).\n\n" .
@@ -215,8 +328,6 @@ class ChatbotService
             "- Professionnel, bienveillant et rassurant.\n" .
             "- Langage clair et simple (évite le jargon technique inutile).\n" .
             "- Adapté au public de la République Démocratique du Congo (RDC).\n\n" .
-            "OBLIGATOIRE :\n" .
-            "- Termine toujours tes réponses par : \"Pour plus de détails, veuillez vous rapprocher de notre agence IMF Bisou Bisou.\"\n\n" .
             "Si une information est manquante dans le contexte, réponds poliment que tu n'as pas cette information précise et termine en invitant le client à se rendre en agence au 218, Avenue Colonel Ebeya Gombe, Kinshasa-RDC.";
 
         // Add dynamic product information
@@ -235,6 +346,18 @@ class ChatbotService
             $productContext .= "- {$credit->display_name} : Montant {$credit->amount_range}, Durée {$credit->duration_range}, Taux {$credit->interest_rate}, Frais d'étude {$credit->file_fee}, Garantie: {$credit->guarantee}.\n";
         }
 
-        return $basePrompt . $productContext;
+        // Section gestion des plaintes
+        $complaintSection = "\n\n--- GESTION DES PLAINTES ---\n" .
+            "Si l'utilisateur exprime une insatisfaction, un problème, une réclamation ou souhaite déposer une plainte " .
+            "(exemples : \"j'ai un problème\", \"je veux me plaindre\", \"ça ne marche pas\", \"je suis mécontent\", " .
+            "\"je veux faire une réclamation\"), tu dois :\n" .
+            "1. Répondre avec empathie et professionnalisme.\n" .
+            "2. L'informer que tu vas l'aider à enregistrer sa plainte.\n" .
+            "3. Terminer OBLIGATOIREMENT ta réponse par le marqueur exact suivant sur une ligne séparée :\n" .
+            "   [INITIATE_COMPLAINT_FLOW]\n\n" .
+            "Ne génère ce marqueur que si l'utilisateur exprime clairement une plainte ou une insatisfaction. " .
+            "Pour une simple question ou une demande d'information, réponds normalement sans ce marqueur.";
+
+        return $basePrompt . $productContext . $complaintSection;
     }
 }

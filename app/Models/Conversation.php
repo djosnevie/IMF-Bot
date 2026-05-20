@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Conversation extends Model
 {
@@ -19,25 +20,31 @@ class Conversation extends Model
         'last_message_at' => 'datetime',
     ];
 
-    /**
-     * Get all messages for this conversation
-     */
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     public function messages()
     {
         return $this->hasMany(Message::class);
     }
 
-    /**
-     * Scope for active conversations
-     */
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
     }
 
-    /**
-     * Get or create a conversation for a user
-     */
     public static function getOrCreate(string $userIdentifier, string $platform = 'whatsapp')
     {
         return static::firstOrCreate(

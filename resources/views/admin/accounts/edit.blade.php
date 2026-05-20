@@ -15,7 +15,7 @@
 
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div class="p-8">
-                <form action="{{ route('admin.accounts.update', $account->id) }}" method="POST" class="space-y-6">
+                <form action="{{ route('admin.accounts.update', $account->uuid) }}" method="POST" class="space-y-6">
                     @csrf
                     @method('PUT')
 
