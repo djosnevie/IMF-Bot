@@ -102,6 +102,72 @@ class CampaignController extends Controller
     }
 
     /**
+     * Affiche le formulaire d'édition d'une campagne non envoyée.
+     *
+     * @param Campaign $campaign Campagne à éditer
+     *
+     * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
+     */
+    public function edit(Campaign $campaign)
+    {
+        if (! in_array($campaign->status, ['draft', 'scheduled'])) {
+            return redirect()->route('admin.crm.campaigns.index')
+                ->with('error', 'Seules les campagnes non envoyées (brouillon ou planifiées) peuvent être modifiées.');
+        }
+
+        $availableTags = ContactTag::select('name')
+            ->groupBy('name')
+            ->orderBy('name')
+            ->pluck('name');
+
+        return view('admin.crm.campaigns.edit', compact('campaign', 'availableTags'));
+    }
+
+    /**
+     * Met à jour une campagne non envoyée.
+     *
+     * @param Request  $request  Données du formulaire
+     * @param Campaign $campaign Campagne à mettre à jour
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function update(Request $request, Campaign $campaign)
+    {
+        if (! in_array($campaign->status, ['draft', 'scheduled'])) {
+            return redirect()->route('admin.crm.campaigns.index')
+                ->with('error', 'Seules les campagnes non envoyées (brouillon ou planifiées) peuvent être modifiées.');
+        }
+
+        $data = $request->validate([
+            'name'                    => 'required|string|max:255',
+            'message_template'        => 'required|string|max:4096',
+            'scheduled_at'            => 'nullable|date|after:now',
+            'criteria_tags'           => 'nullable|array',
+            'criteria_tags.*'         => 'string',
+            'criteria_min_score'      => 'nullable|integer|min:0|max:100',
+            'criteria_inactivity_days' => 'nullable|integer|min:1',
+            'criteria_statuses'       => 'nullable|array',
+            'criteria_statuses.*'     => 'in:lead,prospect,en_cours,client,inactif',
+        ]);
+
+        $campaign->update([
+            'name'             => $data['name'],
+            'message_template' => $data['message_template'],
+            'scheduled_at'     => $data['scheduled_at'] ?? null,
+            'status'           => $data['scheduled_at'] ? 'scheduled' : 'draft',
+            'targeting_criteria' => [
+                'tags'               => $data['criteria_tags'] ?? [],
+                'min_score'          => $data['criteria_min_score'] ?? null,
+                'max_inactivity_days' => $data['criteria_inactivity_days'] ?? null,
+                'statuses'           => $data['criteria_statuses'] ?? [],
+            ],
+        ]);
+
+        return redirect()->route('admin.crm.campaigns.index')
+            ->with('success', "Campagne « {$campaign->name} » mise à jour avec succès.");
+    }
+
+    /**
      * Annule une campagne planifiée ou en draft.
      *
      * @param Campaign $campaign Campagne à annuler

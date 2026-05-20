@@ -111,6 +111,8 @@ Route::prefix('admin')->middleware('auth')->group(function () {
             Route::get('/campaigns', [CampaignController::class, 'index'])->name('campaigns.index');
             Route::get('/campaigns/create', [CampaignController::class, 'create'])->name('campaigns.create');
             Route::post('/campaigns', [CampaignController::class, 'store'])->name('campaigns.store');
+            Route::get('/campaigns/{campaign}/edit', [CampaignController::class, 'edit'])->name('campaigns.edit');
+            Route::put('/campaigns/{campaign}', [CampaignController::class, 'update'])->name('campaigns.update');
             Route::post('/campaigns/{campaign}/cancel', [CampaignController::class, 'cancel'])->name('campaigns.cancel');
             Route::get('/campaigns/eligible-count', [CampaignController::class, 'eligibleCount'])->name('campaigns.eligible-count');
         });

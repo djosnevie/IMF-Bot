@@ -53,13 +53,21 @@
                 </div>
             </div>
             @if(in_array($campaign->status, ['draft','scheduled']))
-            <form action="{{ route('admin.crm.campaigns.cancel', $campaign->id) }}" method="POST"
-                  onsubmit="return confirm('Annuler cette campagne ?');">
-                @csrf
-                <button class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-medium transition-colors border border-red-100">
-                    <i class="fas fa-ban mr-1"></i> Annuler
-                </button>
-            </form>
+            <div class="flex gap-2">
+                @can('crm.campaigns.manage')
+                <a href="{{ route('admin.crm.campaigns.edit', $campaign->id) }}"
+                   class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-medium transition-colors border border-indigo-100 flex items-center gap-1">
+                    <i class="fas fa-edit"></i> Modifier
+                </a>
+                @endcan
+                <form action="{{ route('admin.crm.campaigns.cancel', $campaign->id) }}" method="POST"
+                      onsubmit="return confirm('Annuler cette campagne ?');">
+                    @csrf
+                    <button class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-medium transition-colors border border-red-100 flex items-center gap-1">
+                        <i class="fas fa-ban"></i> Annuler
+                    </button>
+                </form>
+            </div>
             @endif
         </div>
         @if($campaign->status === 'sent' && $campaign->logs_count > 0)
