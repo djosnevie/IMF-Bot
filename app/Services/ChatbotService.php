@@ -54,6 +54,7 @@ class ChatbotService
             $aiResponse = $this->generateAIResponse($conversation, $messageContent);
 
             $responseContent = $aiResponse['content'];
+            $responseContent = $this->formatForWhatsApp($responseContent);
 
             // 3. Détecter le marqueur de déclenchement de plainte dans la réponse IA
             if (str_contains($responseContent, '[INITIATE_COMPLAINT_FLOW]')) {
@@ -195,9 +196,11 @@ class ChatbotService
             return $this->generateOpenAIResponse($conversationHistory, $userMessage);
         } elseif ($provider === 'gemini') {
             return $this->generateGeminiResponse($conversationHistory, $userMessage);
+        } elseif ($provider === 'mistral') {
+            return $this->generateMistralResponse($conversationHistory, $userMessage);
         }
 
-        throw new \Exception("AI provider not configured");
+        throw new \Exception("AI provider not configured or unsupported provider: {$provider}");
     }
 
     /**
@@ -271,7 +274,9 @@ class ChatbotService
 
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
-        ])->timeout(30)->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
+        ])->withOptions([
+            'version' => 1.1,
+        ])->timeout(60)->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
                     'contents' => [
                         [
                             'parts' => [
@@ -297,6 +302,61 @@ class ChatbotService
         }
 
         throw new \Exception('Gemini API error: ' . $response->body());
+    }
+
+    /**
+     * Generate response using Mistral AI
+     */
+    protected function generateMistralResponse(array $conversationHistory, string $userMessage)
+    {
+        $apiKey = config('chatbot.mistral_api_key');
+        $model = config('chatbot.mistral_model', 'mistral-large-latest');
+
+        $messages = [
+            [
+                'role' => 'system',
+                'content' => $this->getSystemPrompt()
+            ]
+        ];
+
+        // Add conversation history
+        foreach ($conversationHistory as $msg) {
+            $messages[] = [
+                'role' => $msg['sender_type'] === 'user' ? 'user' : 'assistant',
+                'content' => $msg['content']
+            ];
+        }
+
+        // Add current message
+        $messages[] = [
+            'role' => 'user',
+            'content' => $userMessage
+        ];
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $apiKey,
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ])->timeout(60)->post('https://api.mistral.ai/v1/chat/completions', [
+            'model' => $model,
+            'messages' => $messages,
+            'temperature' => 0.7,
+            'max_tokens' => 500,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            return [
+                'content' => $data['choices'][0]['message']['content'],
+                'metadata' => [
+                    'provider' => 'mistral',
+                    'model' => $model,
+                    'tokens_used' => $data['usage']['total_tokens'] ?? null,
+                ]
+            ];
+        }
+
+        throw new \Exception('Mistral API error: ' . $response->body());
     }
 
     /**
@@ -345,7 +405,8 @@ class ChatbotService
             "STYLE & TON :\n" .
             "- Professionnel, bienveillant et rassurant.\n" .
             "- Langage clair et simple (évite le jargon technique inutile).\n" .
-            "- Adapté au public de la République Démocratique du Congo (RDC).\n\n" .
+            "- Adapté au public de la République Démocratique du Congo (RDC).\n" .
+            "- FORMATAGE WHATSAPP: Utilise *texte* pour le gras, _texte_ pour l'italique. N'utilise JAMAIS les formats Markdown standards comme **texte** ou les titres avec #.\n\n" .
             "Si une information est manquante dans le contexte, réponds poliment que tu n'as pas cette information précise et termine en invitant le client à se rendre en agence au 218, Avenue Colonel Ebeya Gombe, Kinshasa-RDC.";
 
         // Add dynamic product information
@@ -377,5 +438,31 @@ class ChatbotService
             "Pour une simple question ou une demande d'information, réponds normalement sans ce marqueur.";
 
         return $basePrompt . $productContext . $complaintSection;
+    }
+
+    /**
+     * Format standard Markdown to WhatsApp compatible text.
+     */
+    protected function formatForWhatsApp(string $text): string
+    {
+        // 1. Convert headers ### Titre to *Titre*
+        $text = preg_replace('/^#{1,6}\s+(.*?)$/m', '*$1*', $text);
+        
+        // 2. Reduce multiple formatting chars to single for WhatsApp
+        // **bold** -> *bold*, ** -> *
+        $text = preg_replace('/\*{2,}/', '*', $text);
+        // __italic__ -> _italic_
+        $text = preg_replace('/_{2,}/', '_', $text);
+        
+        // 3. Remove horizontal rules ---
+        $text = preg_replace('/^[-_*]{3,}$/m', '', $text);
+        
+        // 4. Replace markdown links [text](url) with text: url
+        $text = preg_replace('/\[(.*?)\]\((.*?)\)/', '$1: $2', $text);
+        
+        // 5. Remove extra empty lines
+        $text = preg_replace("/\n{3,}/", "\n\n", $text);
+        
+        return trim($text);
     }
 }

@@ -16,7 +16,7 @@ return [
     | AI Provider
     |--------------------------------------------------------------------------
     |
-    | Supported: "openai", "gemini"
+    | Supported: "openai", "gemini", "mistral"
     |
     */
     'ai_provider' => env('CHATBOT_AI_PROVIDER', 'openai'),
@@ -36,6 +36,14 @@ return [
     */
     'gemini_api_key' => env('GEMINI_API_KEY'),
     'gemini_model' => env('GEMINI_MODEL', 'gemini-pro'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mistral Configuration
+    |--------------------------------------------------------------------------
+    */
+    'mistral_api_key' => env('MISTRAL_API_KEY'),
+    'mistral_model' => env('MISTRAL_MODEL', 'mistral-large-latest'),
 
     /*
     |--------------------------------------------------------------------------
