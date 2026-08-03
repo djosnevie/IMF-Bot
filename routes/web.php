@@ -32,8 +32,8 @@ Route::get('/webhook', [WebhookController::class, 'verify']);
 Route::post('/webhook', [WebhookController::class, 'handle']);
 
 // Complaint CTA Form Routes (Public)
-Route::get('/wa/complaint', [\App\Http\Controllers\ComplaintWebController::class, 'showForm'])->name('complaint.form');
-Route::post('/wa/complaint', [\App\Http\Controllers\ComplaintWebController::class, 'submitForm'])->name('complaint.submit');
+Route::get('/wa/c/{token}', [\App\Http\Controllers\ComplaintWebController::class, 'showForm'])->name('complaint.form');
+Route::post('/wa/c/{token}', [\App\Http\Controllers\ComplaintWebController::class, 'submitForm'])->name('complaint.submit');
 
 // Admin Dashboard Routes (Protected)
 Route::prefix('admin')->middleware('auth')->group(function () {

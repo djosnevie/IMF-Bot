@@ -146,17 +146,16 @@ class WebhookController extends Controller
                     }
 
                     if (!empty($result['send_as_flow'])) {
-                        // Generate signed URL
-                        $nonce = \Illuminate\Support\Str::uuid()->toString();
-                        \Illuminate\Support\Facades\Cache::put('complaint_nonce_' . $nonce, true, now()->addMinutes(15));
+                        // Generate short token URL
+                        $token = \Illuminate\Support\Str::random(6);
                         
-                        $url = \Illuminate\Support\Facades\URL::temporarySignedRoute(
-                            'complaint.form', now()->addMinutes(15), [
-                                'user_identifier' => $userIdentifier,
-                                'conversation_id' => $result['conversation_id'],
-                                'nonce' => $nonce,
-                            ]
-                        );
+                        $payloadData = [
+                            'user_identifier' => $userIdentifier,
+                            'conversation_id' => $result['conversation_id'],
+                        ];
+                        \Illuminate\Support\Facades\Cache::put('complaint_token_' . $token, $payloadData, now()->addMinutes(15));
+                        
+                        $url = url('/wa/c/' . $token);
 
                         $this->webhookService->sendCtaUrlMessage(
                             $userIdentifier, 

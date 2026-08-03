@@ -46,11 +46,8 @@
                 </div>
             @endif
 
-            <form action="{{ route('complaint.submit', ['signature' => request()->query('signature')]) }}" method="POST" @submit="submitting = true">
+            <form action="{{ route('complaint.submit', ['token' => $token]) }}" method="POST" @submit="submitting = true">
                 @csrf
-                <input type="hidden" name="user_identifier" value="{{ $user_identifier }}">
-                <input type="hidden" name="conversation_id" value="{{ $conversation_id }}">
-                <input type="hidden" name="nonce" value="{{ $nonce }}">
 
                 <!-- Type de plainte -->
                 <div class="mb-5">

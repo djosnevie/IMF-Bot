@@ -12,47 +12,37 @@ use App\Services\WebhookService;
 
 class ComplaintWebController extends Controller
 {
-    public function showForm(Request $request)
+    public function showForm(Request $request, $token)
     {
-        if (!$request->hasValidSignature()) {
-            return view('complaints.error', ['message' => 'Ce lien a expiré ou est invalide pour des raisons de sécurité. Veuillez demander un nouveau lien sur WhatsApp.']);
-        }
-
-        $nonce = $request->query('nonce');
-        if (!Cache::has('complaint_nonce_' . $nonce)) {
-            return view('complaints.error', ['message' => 'Ce formulaire a déjà été soumis avec succès pour cette requête.']);
+        $data = Cache::get('complaint_token_' . $token);
+        if (!$data) {
+            return view('complaints.error', ['message' => 'Ce lien a expiré, est invalide, ou le formulaire a déjà été soumis. Veuillez demander un nouveau lien sur WhatsApp.']);
         }
 
         $complaintTypes = ComplaintType::where('is_active', true)->get();
 
         return view('complaints.web_form', [
-            'user_identifier' => $request->query('user_identifier'),
-            'conversation_id' => $request->query('conversation_id'),
-            'nonce' => $nonce,
+            'user_identifier' => $data['user_identifier'],
+            'conversation_id' => $data['conversation_id'],
+            'token' => $token,
             'complaintTypes' => $complaintTypes,
         ]);
     }
 
-    public function submitForm(Request $request, ComplaintService $complaintService, WebhookService $webhookService)
+    public function submitForm(Request $request, ComplaintService $complaintService, WebhookService $webhookService, $token)
     {
-        if (!$request->hasValidSignature()) {
-            return view('complaints.error', ['message' => 'Ce lien a expiré ou est invalide.']);
-        }
-
-        $nonce = $request->input('nonce');
-        if (!Cache::has('complaint_nonce_' . $nonce)) {
-            return view('complaints.error', ['message' => 'Ce formulaire a déjà été soumis avec succès pour cette requête.']);
+        $data = Cache::get('complaint_token_' . $token);
+        if (!$data) {
+            return view('complaints.error', ['message' => 'Ce lien a expiré, est invalide, ou le formulaire a déjà été soumis.']);
         }
 
         $validated = $request->validate([
-            'user_identifier' => 'required|string',
-            'conversation_id' => 'required|integer',
             'complaint_type_code' => 'nullable|string',
             'urgency' => 'nullable|string|in:low,medium,high',
             'description' => 'required|string|max:2000',
         ]);
 
-        $conversation = Conversation::find($validated['conversation_id']);
+        $conversation = Conversation::find($data['conversation_id']);
         if (!$conversation) {
             return view('complaints.error', ['message' => 'Conversation introuvable.']);
         }
@@ -65,8 +55,8 @@ class ComplaintWebController extends Controller
             $validated['urgency'] ?? 'medium'
         );
 
-        // Invalidate nonce
-        Cache::forget('complaint_nonce_' . $nonce);
+        // Invalidate token
+        Cache::forget('complaint_token_' . $token);
         
         // Clean up flow metadata if it exists
         $metadata = $conversation->metadata;
