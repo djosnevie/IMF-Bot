@@ -29,6 +29,8 @@ class Complaint extends Model
         'subject',
         'description',
         'category',
+        'sub_category',
+        'urgency',
         'status',
     ];
 

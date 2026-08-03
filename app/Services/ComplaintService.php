@@ -46,7 +46,9 @@ class ComplaintService
             'status' => 'new',
         ]);
 
-        Log::info('📋 Plainte et ticket créés', [
+        $this->assignTicketToAgents($ticket, null);
+
+        Log::info('📋 Plainte et ticket créés (conversation)', [
             'complaint_id' => $complaint->id,
             'ticket_reference' => $reference,
             'whatsapp_number' => $conversation->user_identifier,
@@ -54,6 +56,69 @@ class ComplaintService
         ]);
 
         return $ticket;
+    }
+
+    /**
+     * Créer une plainte et son ticket depuis les données du formulaire web.
+     *
+     * @param Conversation $conversation
+     * @param string|null $subCategoryCode
+     * @param string $description
+     * @param string $urgency
+     * @return Ticket
+     */
+    public function createFromWeb(
+        Conversation $conversation,
+        ?string $subCategoryCode,
+        string $description,
+        string $urgency = 'medium'
+    ): Ticket {
+        $complaintType = $subCategoryCode ? \App\Models\ComplaintType::where('code', $subCategoryCode)->first() : null;
+        $subject = $complaintType ? $complaintType->name : 'Plainte depuis WhatsApp';
+
+        $complaint = Complaint::create([
+            'conversation_id' => $conversation->id,
+            'whatsapp_number' => $conversation->user_identifier,
+            'subject' => $subject,
+            'description' => $description,
+            'category' => 'other',
+            'sub_category' => $subCategoryCode,
+            'urgency' => $urgency,
+            'status' => 'pending',
+        ]);
+
+        $reference = $this->generateTicketReference();
+
+        $ticket = Ticket::create([
+            'complaint_id' => $complaint->id,
+            'reference' => $reference,
+            'priority' => $urgency,
+            'status' => 'new',
+        ]);
+
+        $this->assignTicketToAgents($ticket, $complaintType);
+
+        Log::info('📋 Plainte et ticket créés (web CTA)', [
+            'ticket_reference' => $reference,
+            'sub_category' => $subCategoryCode,
+        ]);
+
+        return $ticket;
+    }
+
+    /**
+     * Assigner le ticket aux agents compétents
+     */
+    private function assignTicketToAgents(Ticket $ticket, ?\App\Models\ComplaintType $complaintType = null)
+    {
+        if ($complaintType) {
+            $agentIds = $complaintType->users()->pluck('users.id');
+            if ($agentIds->isNotEmpty()) {
+                $ticket->users()->attach($agentIds);
+                
+                \App\Jobs\NotifyAgentsOfNewTicketJob::dispatch($ticket);
+            }
+        }
     }
 
     /**

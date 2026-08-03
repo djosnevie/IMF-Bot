@@ -62,6 +62,60 @@
         </div>
     @endif
 
+    <!-- Section Informations de Base -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Informations de base</h3>
+        <form action="{{ route('admin.users.update', $user->uuid) }}" method="POST">
+            @csrf
+            @method('PUT')
+            
+            <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                <div class="sm:col-span-3">
+                    <label for="name" class="block text-sm font-medium text-gray-700">Nom complet</label>
+                    <div class="mt-1">
+                        <input type="text" name="name" id="name" value="{{ old('name', $user->name) }}" required
+                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                    </div>
+                    @error('name')
+                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="sm:col-span-3">
+                    <label for="email" class="block text-sm font-medium text-gray-700">Adresse Email</label>
+                    <div class="mt-1">
+                        <input type="email" name="email" id="email" value="{{ old('email', $user->email) }}" required
+                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                    </div>
+                    @error('email')
+                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="sm:col-span-3">
+                    <label for="whatsapp_number" class="block text-sm font-medium text-gray-700">
+                        Numéro WhatsApp <span class="text-xs font-normal text-gray-500">(Agents uniquement)</span>
+                    </label>
+                    <div class="mt-1">
+                        <input type="text" name="whatsapp_number" id="whatsapp_number" value="{{ old('whatsapp_number', $user->whatsapp_number) }}"
+                            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            placeholder="Ex: 243XXXXXXXXX">
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">Nécessaire uniquement pour le support client.</p>
+                    @error('whatsapp_number')
+                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    Mettre à jour les informations
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Section Rôle -->
     <div class="bg-white shadow rounded-lg p-6">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Rôle assigné</h3>

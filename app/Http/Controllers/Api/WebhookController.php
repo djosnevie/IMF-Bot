@@ -84,6 +84,16 @@ class WebhookController extends Controller
             $userIdentifier = $parsedData['user_identifier'];
             $messageType = $parsedData['message_type'];
             $content = $parsedData['content'] ?? '';
+            $messageId = $parsedData['message_id'] ?? null;
+
+            // 🚫 Déduplication pour éviter les réponses multiples lors des retentatives de WhatsApp
+            if ($messageId) {
+                if (\Illuminate\Support\Facades\Cache::has('processed_message_' . $messageId)) {
+                    \Log::info('⏭️ Message ignoré (déjà en cours de traitement / déjà traité)', ['message_id' => $messageId]);
+                    return response()->json(['status' => 'ok'], 200);
+                }
+                \Illuminate\Support\Facades\Cache::put('processed_message_' . $messageId, true, now()->addMinutes(5));
+            }
 
             // 🔍 LOG: Type de message
             \Log::info('💬 MESSAGE DÉTECTÉ', [
@@ -114,27 +124,53 @@ class WebhookController extends Controller
                 return response()->json(['status' => 'ok'], 200);
             }
 
-            // For other text messages, process with AI (Priority 1 for intelligence)
-            if ($messageType === 'text' && !empty($content)) {
-                \Log::info('🤖 Traitement avec IA', ['content' => $content]);
+            $isText = $messageType === 'text' && !empty($content);
+
+            // For text messages, process with ChatbotService
+            if ($isText) {
+                \Log::info('🤖 Traitement avec ChatbotService', ['content' => $content]);
 
                 $result = $this->chatbotService->processMessage(
                     $userIdentifier,
                     $content,
-                    'whatsapp'
+                    'whatsapp',
+                    $parsedData
                 );
 
                 if ($result['success']) {
                     $aiResponse = $result['response'];
 
                     // Simuler la frappe humaine avant d'envoyer la réponse
-                    $this->webhookService->simulateTyping($parsedData['message_id'], $aiResponse);
+                    if (!empty($aiResponse)) {
+                        $this->webhookService->simulateTyping($parsedData['message_id'], $aiResponse);
+                    }
 
-                    // Send response via WhatsApp as plain text
-                    $sent = $this->webhookService->sendWhatsAppMessage(
-                        $userIdentifier,
-                        trim($aiResponse)
-                    );
+                    if (!empty($result['send_as_flow'])) {
+                        // Generate signed URL
+                        $nonce = \Illuminate\Support\Str::uuid()->toString();
+                        \Illuminate\Support\Facades\Cache::put('complaint_nonce_' . $nonce, true, now()->addMinutes(15));
+                        
+                        $url = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                            'complaint.form', now()->addMinutes(15), [
+                                'user_identifier' => $userIdentifier,
+                                'conversation_id' => $result['conversation_id'],
+                                'nonce' => $nonce,
+                            ]
+                        );
+
+                        $this->webhookService->sendCtaUrlMessage(
+                            $userIdentifier, 
+                            trim($aiResponse) ?: "Veuillez cliquer sur le bouton ci-dessous pour remplir le formulaire de plainte.", 
+                            "Ouvrir formulaire", 
+                            $url
+                        );
+                    } elseif (!empty($aiResponse)) {
+                        // Send response via WhatsApp as plain text
+                        $this->webhookService->sendWhatsAppMessage(
+                            $userIdentifier,
+                            trim($aiResponse)
+                        );
+                    }
 
                     $this->webhookService->logWebhook(
                         'whatsapp',

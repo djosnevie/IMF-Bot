@@ -221,15 +221,40 @@ class DashboardController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
+            'whatsapp_number' => ['nullable', 'string', 'regex:/^243[0-9]{9}$/'],
+        ], [
+            'whatsapp_number.regex' => 'Le numéro WhatsApp doit être au format international pour la RDC (ex: 243 suivi de 9 chiffres).'
         ]);
 
         \App\Models\User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => \Illuminate\Support\Facades\Hash::make($data['password']),
+            'whatsapp_number' => $data['whatsapp_number'] ?? null,
         ]);
 
         return redirect()->route('admin.users')->with('success', 'Utilisateur créé avec succès.');
+    }
+
+    public function updateUser(Request $request, $id)
+    {
+        $user = \App\Models\User::where('uuid', $id)->firstOrFail();
+        
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'whatsapp_number' => ['nullable', 'string', 'regex:/^243[0-9]{9}$/'],
+        ], [
+            'whatsapp_number.regex' => 'Le numéro WhatsApp doit être au format international pour la RDC (ex: 243 suivi de 9 chiffres).'
+        ]);
+
+        $user->update([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'whatsapp_number' => $data['whatsapp_number'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', 'Informations de l\'utilisateur mises à jour.');
     }
 
     public function editUser($id)

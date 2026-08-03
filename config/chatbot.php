@@ -16,7 +16,7 @@ return [
     | AI Provider
     |--------------------------------------------------------------------------
     |
-    | Supported: "openai", "gemini", "mistral"
+    | Supported: "openai", "gemini", "mistral", "claude"
     |
     */
     'ai_provider' => env('CHATBOT_AI_PROVIDER', 'openai'),
@@ -47,6 +47,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Anthropic Claude Configuration
+    |--------------------------------------------------------------------------
+    */
+    'claude_api_key' => env('CLAUDE_API_KEY'),
+    'claude_model' => env('CLAUDE_MODEL', 'claude-3-5-sonnet-20240620'),
+
+    /*
+    |--------------------------------------------------------------------------
     | WhatsApp Business API Configuration
     |--------------------------------------------------------------------------
     */
@@ -54,6 +62,7 @@ return [
     'whatsapp_access_token' => env('WHATSAPP_ACCESS_TOKEN'),
     'whatsapp_phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
     'whatsapp_app_secret' => env('WHATSAPP_APP_SECRET'),
+    'whatsapp_complaint_flow_id' => env('WHATSAPP_COMPLAINT_FLOW_ID'),
 
     /*
     |--------------------------------------------------------------------------

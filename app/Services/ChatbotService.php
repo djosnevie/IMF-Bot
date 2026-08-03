@@ -22,7 +22,7 @@ class ChatbotService
      *
      * @return array Résultat du traitement avec clés success, response, conversation_id
      */
-    public function processMessage(string $userIdentifier, string $messageContent, string $platform = 'whatsapp')
+    public function processMessage(string $userIdentifier, string $messageContent, string $platform = 'whatsapp', array $parsedData = [])
     {
         try {
             // Get or create conversation
@@ -35,7 +35,7 @@ class ChatbotService
             $complaintFlow = $conversation->metadata['complaint_flow'] ?? null;
 
             if ($complaintFlow) {
-                $botResponse = $this->handleComplaintFlow($conversation, $messageContent, $complaintFlow);
+                $botResponse = $this->handleComplaintFlow($conversation, $messageContent, $complaintFlow, $parsedData);
 
                 // Sauvegarder la réponse du bot
                 $this->saveMessage($conversation->id, 'bot', $botResponse);
@@ -64,14 +64,30 @@ class ChatbotService
                 // Initialiser le flux de plainte dans la metadata
                 $metadata = $conversation->metadata ?? [];
                 $metadata['complaint_flow'] = [
-                    'step' => 'awaiting_subject',
+                    'step' => 'awaiting_flow_submission',
                     'subject' => null,
                     'description' => null,
                 ];
                 $conversation->update(['metadata' => $metadata]);
 
-                // Ajouter la question sur le sujet après la réponse empathique
-                $responseContent .= "\n\nQuel est le sujet de votre plainte ? (Ex : problème de remboursement, erreur sur mon compte, etc.)";
+                // Save bot message before returning
+                $botMessage = $this->saveMessage(
+                    $conversation->id,
+                    'bot',
+                    $responseContent,
+                    $aiResponse['metadata']
+                );
+
+                // Mise à jour du timestamp de la conversation
+                $conversation->update(['last_message_at' => now()]);
+
+                // Demander l'envoi du Flow au lieu du texte normal
+                return [
+                    'success' => true,
+                    'response' => $responseContent,
+                    'conversation_id' => $conversation->id,
+                    'send_as_flow' => true,
+                ];
             }
 
             // Save bot message
@@ -128,18 +144,43 @@ class ChatbotService
      *
      * @return string La réponse à envoyer à l'utilisateur
      */
-    private function handleComplaintFlow(Conversation $conversation, string $userMessage, array $flow): string
+    private function handleComplaintFlow(Conversation $conversation, string $userMessage, array $flow, array $parsedData): string
     {
         $step = $flow['step'];
 
-        if ($step === 'awaiting_subject') {
-            // Stocker le sujet, passer à l'étape suivante
-            $metadata = $conversation->metadata;
-            $metadata['complaint_flow']['subject'] = $userMessage;
-            $metadata['complaint_flow']['step'] = 'awaiting_description';
-            $conversation->update(['metadata' => $metadata]);
+        if ($step === 'awaiting_flow_submission') {
+            $isFlowReply = ($parsedData['interactive_type'] ?? '') === 'nfm_reply';
+            
+            if ($isFlowReply && isset($parsedData['flow_data'])) {
+                $flowData = $parsedData['flow_data'];
+                $subCategoryCode = $flowData['sub_category'] ?? null;
+                $description = $flowData['description'] ?? '';
+                $urgency = $flowData['urgency'] ?? 'medium';
+                
+                try {
+                    $complaintService = app(ComplaintService::class);
+                    $ticket = $complaintService->createFromFlowData($conversation, $subCategoryCode, $description, $urgency);
+                    
+                    // Clore le flux
+                    $metadata = $conversation->metadata;
+                    unset($metadata['complaint_flow']);
+                    $conversation->update(['metadata' => $metadata]);
 
-            return "Merci. Pouvez-vous maintenant décrire votre problème en détail ? Plus vous êtes précis(e), plus nous pourrons vous aider rapidement.";
+                    return "Merci. Votre demande a été enregistrée sous la référence *" . $ticket->reference . "*. Notre équipe l'examinera très bientôt.";
+                } catch (\Exception $e) {
+                    Log::error('Error creating complaint from flow: ' . $e->getMessage());
+                    return "Désolée, une erreur est survenue lors de l'enregistrement de votre demande. Veuillez réessayer.";
+                }
+            } else {
+                // FALLBACK: The user sent text instead of the flow.
+                // We switch to the manual flow (awaiting_description).
+                $metadata = $conversation->metadata;
+                $metadata['complaint_flow']['subject'] = $userMessage;
+                $metadata['complaint_flow']['step'] = 'awaiting_description';
+                $conversation->update(['metadata' => $metadata]);
+
+                return "Merci. Pouvez-vous maintenant décrire votre problème en détail ? Plus vous êtes précis(e), plus nous pourrons vous aider rapidement.";
+            }
         }
 
         if ($step === 'awaiting_description') {
@@ -198,6 +239,8 @@ class ChatbotService
             return $this->generateGeminiResponse($conversationHistory, $userMessage);
         } elseif ($provider === 'mistral') {
             return $this->generateMistralResponse($conversationHistory, $userMessage);
+        } elseif ($provider === 'claude') {
+            return $this->generateClaudeResponse($conversationHistory, $userMessage);
         }
 
         throw new \Exception("AI provider not configured or unsupported provider: {$provider}");
@@ -357,6 +400,57 @@ class ChatbotService
         }
 
         throw new \Exception('Mistral API error: ' . $response->body());
+    }
+
+    /**
+     * Generate response using Anthropic Claude
+     */
+    protected function generateClaudeResponse(array $conversationHistory, string $userMessage)
+    {
+        $apiKey = config('chatbot.claude_api_key');
+        $model = config('chatbot.claude_model', 'claude-3-5-sonnet-20240620');
+
+        $messages = [];
+
+        // Add conversation history
+        foreach ($conversationHistory as $msg) {
+            $messages[] = [
+                'role' => $msg['sender_type'] === 'user' ? 'user' : 'assistant',
+                'content' => $msg['content']
+            ];
+        }
+
+        // Add current message
+        $messages[] = [
+            'role' => 'user',
+            'content' => $userMessage
+        ];
+
+        $response = Http::withHeaders([
+            'x-api-key' => $apiKey,
+            'anthropic-version' => '2023-06-01',
+            'content-type' => 'application/json',
+        ])->timeout(60)->post('https://api.anthropic.com/v1/messages', [
+            'model' => $model,
+            'system' => $this->getSystemPrompt(),
+            'messages' => $messages,
+            'max_tokens' => 500,
+            'temperature' => 0.7,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            return [
+                'content' => $data['content'][0]['text'] ?? '',
+                'metadata' => [
+                    'provider' => 'claude',
+                    'model' => $model,
+                    'tokens_used' => $data['usage']['input_tokens'] + $data['usage']['output_tokens'] ?? null,
+                ]
+            ];
+        }
+
+        throw new \Exception('Claude API error: ' . $response->body());
     }
 
     /**

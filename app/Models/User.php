@@ -22,6 +22,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'whatsapp_number',
         'password',
     ];
 
@@ -67,5 +68,21 @@ class User extends Authenticatable
     public function getRouteKeyName(): string
     {
         return 'uuid';
+    }
+
+    /**
+     * Types de plaintes que cet agent est habilité à traiter.
+     */
+    public function complaintTypes()
+    {
+        return $this->belongsToMany(ComplaintType::class);
+    }
+
+    /**
+     * Tickets assignés à cet agent.
+     */
+    public function tickets()
+    {
+        return $this->belongsToMany(Ticket::class);
     }
 }

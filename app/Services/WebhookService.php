@@ -328,6 +328,56 @@ class WebhookService
     }
 
     /**
+     * Send WhatsApp CTA URL (Interactive message)
+     */
+    public function sendCtaUrlMessage(string $to, string $bodyText, string $buttonText, string $url): bool
+    {
+        try {
+            $accessToken = config('chatbot.whatsapp_access_token');
+            $phoneNumberId = config('chatbot.whatsapp_phone_number_id');
+
+            $interactive = [
+                'type' => 'cta_url',
+                'body' => [
+                    'text' => $bodyText
+                ],
+                'action' => [
+                    'name' => 'cta_url',
+                    'parameters' => [
+                        'display_text' => $buttonText,
+                        'url' => $url,
+                    ]
+                ]
+            ];
+
+            $data = [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $to,
+                'type' => 'interactive',
+                'interactive' => $interactive
+            ];
+
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'Bearer ' . $accessToken,
+                'Content-Type' => 'application/json',
+            ])->post("https://graph.facebook.com/v18.0/{$phoneNumberId}/messages", $data);
+
+            if ($response->successful()) {
+                Log::info('✅ CTA URL envoyé avec succès', ['to' => $to]);
+                return true;
+            }
+
+            Log::error('❌ Erreur envoi CTA URL', ['response' => $response->json()]);
+            return false;
+
+        } catch (\Exception $e) {
+            Log::error('WhatsApp send cta url error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Log webhook call
      */
     public function logWebhook(string $platform, array $payload, ?array $response = null, string $status = 'success', ?string $errorMessage = null, ?string $ipAddress = null)

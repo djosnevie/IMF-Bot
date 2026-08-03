@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\Crm\TagController;
 use App\Http\Controllers\Admin\Crm\CampaignController;
 use App\Http\Controllers\Admin\Crm\AlertController;
 use App\Http\Controllers\Admin\Crm\ReportController;
+use App\Http\Controllers\Admin\ComplaintMappingController;
 
 Route::get('/', function () {
     return redirect()->route('admin.dashboard');
@@ -29,6 +30,10 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 // WhatsApp Webhook Routes (Public)
 Route::get('/webhook', [WebhookController::class, 'verify']);
 Route::post('/webhook', [WebhookController::class, 'handle']);
+
+// Complaint CTA Form Routes (Public)
+Route::get('/wa/complaint', [\App\Http\Controllers\ComplaintWebController::class, 'showForm'])->name('complaint.form');
+Route::post('/wa/complaint', [\App\Http\Controllers\ComplaintWebController::class, 'submitForm'])->name('complaint.submit');
 
 // Admin Dashboard Routes (Protected)
 Route::prefix('admin')->middleware('auth')->group(function () {
@@ -70,6 +75,7 @@ Route::prefix('admin')->middleware('auth')->group(function () {
             Route::get('/creer', [DashboardController::class, 'createUser'])->name('admin.users.create');
             Route::post('/', [DashboardController::class, 'storeUser'])->name('admin.users.store');
             Route::get('/{id}/modifier', [DashboardController::class, 'editUser'])->name('admin.users.edit');
+            Route::put('/{id}', [DashboardController::class, 'updateUser'])->name('admin.users.update');
             Route::post('/{id}/role', [DashboardController::class, 'assignRole'])->name('admin.users.role');
             Route::post('/{id}/permissions', [DashboardController::class, 'syncPermissions'])->name('admin.users.permissions');
             Route::delete('/{id}', [DashboardController::class, 'destroyUser'])->name('admin.users.destroy');
@@ -83,6 +89,12 @@ Route::prefix('admin')->middleware('auth')->group(function () {
         Route::post('/{ticket}/assign', [TicketController::class, 'assign'])->name('assign')->middleware('permission:tickets.assign');
         Route::post('/{ticket}/comment', [TicketController::class, 'comment'])->name('comment')->middleware('permission:tickets.comment_internal|tickets.comment_public');
         Route::patch('/{ticket}/status', [TicketController::class, 'updateStatus'])->name('updateStatus')->middleware('permission:tickets.assign');
+    });
+
+    // Mapping Plaintes ↔ Agents
+    Route::middleware('permission:complaint_mappings.manage')->group(function () {
+        Route::get('/complaint-mappings', [ComplaintMappingController::class, 'index'])->name('admin.complaint-mappings.index');
+        Route::post('/complaint-mappings/{complaintType}/agents', [ComplaintMappingController::class, 'syncAgents'])->name('admin.complaint-mappings.sync');
     });
 
     // ─── CRM Natif ────────────────────────────────────────────────────────────

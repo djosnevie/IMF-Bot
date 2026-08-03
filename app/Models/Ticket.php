@@ -53,4 +53,12 @@ class Ticket extends Model
     {
         return $this->hasMany(TicketComment::class);
     }
+
+    /**
+     * Agents assignés à ce ticket.
+     */
+    public function users()
+    {
+        return $this->belongsToMany(User::class);
+    }
 }

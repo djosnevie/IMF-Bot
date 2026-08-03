@@ -39,8 +39,7 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label for="password" class="block text-sm font-semibold text-gray-700 mb-2">Mot de
-                                passe</label>
+                            <label for="password" class="block text-sm font-semibold text-gray-700 mb-2">Mot de passe</label>
                             <input type="password" name="password" id="password" required
                                 class="block w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                 placeholder="••••••••">
@@ -50,12 +49,24 @@
                         </div>
 
                         <div>
-                            <label for="password_confirmation"
-                                class="block text-sm font-semibold text-gray-700 mb-2">Confirmer le mot de passe</label>
+                            <label for="password_confirmation" class="block text-sm font-semibold text-gray-700 mb-2">Confirmer le mot de passe</label>
                             <input type="password" name="password_confirmation" id="password_confirmation" required
                                 class="block w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                 placeholder="••••••••">
                         </div>
+                    </div>
+
+                    <div>
+                        <label for="whatsapp_number" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Numéro WhatsApp <span class="text-xs font-normal text-gray-500">(Agents uniquement)</span>
+                        </label>
+                        <input type="text" name="whatsapp_number" id="whatsapp_number" value="{{ old('whatsapp_number') }}"
+                            class="block w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            placeholder="Ex: 243XXXXXXXXX">
+                        <p class="mt-1 text-xs text-gray-500">Nécessaire uniquement pour les rôles liés au traitement des plaintes.</p>
+                        @error('whatsapp_number')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="pt-4">
