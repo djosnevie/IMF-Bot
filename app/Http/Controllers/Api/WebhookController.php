@@ -172,6 +172,8 @@ class WebhookController extends Controller
                         );
                     }
 
+                    $sent = true;
+
                     $this->webhookService->logWebhook(
                         'whatsapp',
                         $payload,

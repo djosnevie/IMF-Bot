@@ -186,22 +186,14 @@ class WebhookService
     private function calculateTypingDelay(int $length): int
     {
         if ($length < 20) {
-            return 1;  // "OK", "Merci", "Bonjour" → quasi-instantané
+            return 0;  // Quasi-instantané
         }
 
         if ($length < 100) {
-            return 2;  // Réponse courte
+            return 1;  // Réponse courte
         }
 
-        if ($length < 300) {
-            return 3;  // Réponse moyenne
-        }
-
-        if ($length < 500) {
-            return 4;  // Réponse longue
-        }
-
-        return 5;      // Réponse très longue
+        return 2;      // Réponse longue (limité à 2s pour éviter le timeout du webhook WhatsApp)
     }
 
     /**
