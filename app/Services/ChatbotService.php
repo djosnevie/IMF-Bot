@@ -31,7 +31,124 @@ class ChatbotService
             // Save user message
             $userMessage = $this->saveMessage($conversation->id, 'user', $messageContent);
 
-            // 1. Vérifier si un flux de plainte est en cours
+            $metadata = $conversation->metadata ?? [];
+
+            // 0. Traiter les réponses aux boutons de session en pause
+            $buttonId = $parsedData['button_id'] ?? null;
+            if ($buttonId === 'resume_session') {
+                if (isset($metadata['paused_flow'])) {
+                    $metadata['complaint_flow'] = $metadata['paused_flow'];
+                    unset($metadata['paused_flow']);
+                    unset($metadata['paused_flow_name']);
+                    unset($metadata['pending_message']);
+                    $conversation->update(['metadata' => $metadata]);
+                    
+                    // Renvoyer un message pour inciter l'utilisateur à continuer
+                    $step = $metadata['complaint_flow']['step'] ?? '';
+                    $msg = "✅ Session reprise.\n\n";
+                    if ($step === 'awaiting_description') {
+                        $msg .= "Pouvez-vous décrire votre problème en détail ?";
+                    } else {
+                        $msg .= "Veuillez continuer là où vous vous étiez arrêté(e).";
+                    }
+
+                    $this->saveMessage($conversation->id, 'bot', $msg);
+                    $conversation->update(['last_message_at' => now()]);
+
+                    return [
+                        'success' => true,
+                        'response' => $msg,
+                        'conversation_id' => $conversation->id,
+                        'send_as_flow' => false,
+                    ];
+                }
+            } elseif ($buttonId === 'cancel_session') {
+                if (isset($metadata['paused_flow'])) {
+                    $pendingMessage = $metadata['pending_message'] ?? null;
+                    
+                    unset($metadata['paused_flow']);
+                    unset($metadata['paused_flow_name']);
+                    unset($metadata['pending_message']);
+                    $conversation->update(['metadata' => $metadata]);
+                    
+                    if ($pendingMessage) {
+                        // Confirmer l'annulation avant de traiter le message
+                        $webhookService = app(\App\Services\WebhookService::class);
+                        $webhookService->sendWhatsAppMessage($userIdentifier, "✅ Session annulée. Je traite votre nouvelle demande...");
+                        
+                        // Remplacer le message actuel (bouton) par le message en attente
+                        $messageContent = $pendingMessage;
+                        
+                        // Laisser le code continuer vers la suite (IA)
+                    } else {
+                        $msg = "✅ Session annulée. Que souhaitez-vous faire ?";
+                        $this->saveMessage($conversation->id, 'bot', $msg);
+                        $conversation->update(['last_message_at' => now()]);
+
+                        return [
+                            'success' => true,
+                            'response' => $msg,
+                            'conversation_id' => $conversation->id,
+                            'send_as_flow' => false,
+                        ];
+                    }
+                }
+            }
+
+            // 1. Mettre en pause le flux si la conversation est inactive depuis un moment (ex: 1 heure)
+            // On le fait si la conversation était dans un flux ET qu'il y a de l'inactivité.
+            // On peut aussi le faire systématiquement si le message ne correspond pas au flux attendu, 
+            // mais l'inactivité est plus sûre pour commencer.
+            if ($conversation->last_message_at && $conversation->last_message_at->diffInHours(now()) >= 1) {
+                if (isset($metadata['complaint_flow'])) {
+                    $metadata['paused_flow'] = $metadata['complaint_flow'];
+                    $metadata['paused_flow_name'] = 'Plainte';
+                    unset($metadata['complaint_flow']);
+                    $conversation->update(['metadata' => $metadata]);
+                }
+            }
+
+            // 2. Si la session est en pause, envoyer les boutons et stopper le traitement
+            if (isset($metadata['paused_flow'])) {
+                // Sauvegarder le message texte pour pouvoir le traiter s'ils choisissent "Nouvelle opération"
+                if (!isset($parsedData['button_id']) && !isset($parsedData['interactive_type'])) {
+                    $metadata['pending_message'] = $messageContent;
+                    $conversation->update(['metadata' => $metadata]);
+                }
+
+                $operationName = $metadata['paused_flow_name'] ?? 'Opération';
+                
+                $webhookService = app(\App\Services\WebhookService::class);
+                $webhookService->sendButtons(
+                    $userIdentifier,
+                    "⚠️ *Session en pause*\n\nVous n'avez pas terminé votre précédente opération (*{$operationName}*).\n\nVoulez-vous la reprendre ou lancer une nouvelle opération ?",
+                    [
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'resume_session',
+                                'title' => 'Reprendre'
+                            ]
+                        ],
+                        [
+                            'type' => 'reply',
+                            'reply' => [
+                                'id' => 'cancel_session',
+                                'title' => 'Nouvelle opération'
+                            ]
+                        ]
+                    ]
+                );
+
+                return [
+                    'success' => true,
+                    'response' => '', // Pas de texte, on a envoyé des boutons
+                    'conversation_id' => $conversation->id,
+                    'send_as_flow' => false,
+                ];
+            }
+
+            // 3. Vérifier si un flux de plainte est en cours
             $complaintFlow = $conversation->metadata['complaint_flow'] ?? null;
 
             if ($complaintFlow) {
@@ -50,7 +167,27 @@ class ChatbotService
                 ];
             }
 
-            // 2. Sinon : flux normal → appel IA
+            // 4. Gérer les messages d'accueil pour éviter un appel IA inutile
+            $welcomeService = app(\App\Services\WelcomeService::class);
+            if ($welcomeService->isGreetingRequest($messageContent)) {
+                $greetingText = "Bonjour 👋🏽, je suis Sophie, assistante virtuelle de l'IMF Bisou Bisou.\n\nComment puis-je vous aider aujourd'hui ?\n\nJe peux vous renseigner sur nos comptes, crédits et services.";
+                
+                $botMessage = $this->saveMessage(
+                    $conversation->id,
+                    'bot',
+                    $greetingText
+                );
+
+                $conversation->update(['last_message_at' => now()]);
+
+                return [
+                    'success' => true,
+                    'response' => $greetingText,
+                    'conversation_id' => $conversation->id,
+                ];
+            }
+
+            // 5. Sinon : flux normal → appel IA
             $aiResponse = $this->generateAIResponse($conversation, $messageContent);
 
             $responseContent = $aiResponse['content'];
@@ -61,8 +198,17 @@ class ChatbotService
                 // Nettoyer le marqueur de la réponse visible
                 $responseContent = trim(str_replace('[INITIATE_COMPLAINT_FLOW]', '', $responseContent));
 
-                // Initialiser le flux de plainte dans la metadata
+                $token = bin2hex(random_bytes(16));
+                
+                // Sauvegarder le token dans le cache pour 10 minutes avec les infos de conversation
+                \Illuminate\Support\Facades\Cache::put('complaint_token_' . $token, [
+                    'user_identifier' => $conversation->user_identifier,
+                    'conversation_id' => $conversation->id
+                ], now()->addMinutes(10));
+                
+                // Initialiser le flux de plainte dans la metadata avec le token
                 $metadata = $conversation->metadata ?? [];
+                $metadata['form_token'] = $token;
                 $metadata['complaint_flow'] = [
                     'step' => 'awaiting_flow_submission',
                     'subject' => null,
@@ -81,12 +227,13 @@ class ChatbotService
                 // Mise à jour du timestamp de la conversation
                 $conversation->update(['last_message_at' => now()]);
 
-                // Demander l'envoi du Flow au lieu du texte normal
+                // Demander l'envoi de l'URL CTA au lieu du texte normal
                 return [
                     'success' => true,
                     'response' => $responseContent,
                     'conversation_id' => $conversation->id,
-                    'send_as_flow' => true,
+                    'send_as_cta_url' => true,
+                    'form_token' => $token
                 ];
             }
 
@@ -149,7 +296,7 @@ class ChatbotService
         $step = $flow['step'];
 
         if ($step === 'awaiting_flow_submission') {
-            $isFlowReply = ($parsedData['interactive_type'] ?? '') === 'nfm_reply';
+            $isFlowReply = ($parsedData['interactive_type'] ?? '') === 'nfm_reply' || ($parsedData['interactive_type'] ?? '') === 'web_form_reply';
             
             if ($isFlowReply && isset($parsedData['flow_data'])) {
                 $flowData = $parsedData['flow_data'];
@@ -172,46 +319,24 @@ class ChatbotService
                     return "Désolée, une erreur est survenue lors de l'enregistrement de votre demande. Veuillez réessayer.";
                 }
             } else {
-                // FALLBACK: The user sent text instead of the flow.
-                // We switch to the manual flow (awaiting_description).
+                // FALLBACK: L'utilisateur a envoyé du texte au lieu de remplir le formulaire.
                 $metadata = $conversation->metadata;
-                $metadata['complaint_flow']['subject'] = $userMessage;
-                $metadata['complaint_flow']['step'] = 'awaiting_description';
+                $metadata['paused_flow'] = $metadata['complaint_flow'];
+                $metadata['paused_flow_name'] = 'Plainte';
+                unset($metadata['complaint_flow']);
                 $conversation->update(['metadata' => $metadata]);
 
-                return "Merci. Pouvez-vous maintenant décrire votre problème en détail ? Plus vous êtes précis(e), plus nous pourrons vous aider rapidement.";
-            }
-        }
-
-        if ($step === 'awaiting_description') {
-            $subject = $flow['subject'];
-            $description = $userMessage;
-
-            try {
-                // Créer la plainte et le ticket
-                $complaintService = app(ComplaintService::class);
-                $ticket = $complaintService->createFromConversation(
-                    $conversation,
-                    $subject,
-                    $description,
-                    $complaintService->detectCategory($subject, $description)
+                $webhookService = app(\App\Services\WebhookService::class);
+                $webhookService->sendButtons(
+                    $conversation->user_identifier,
+                    "⚠️ Opération en attente\n\nVous avez une *Plainte* en cours. Pour la finaliser, vous devez remplir le formulaire (via le bouton envoyé plus haut).\n\nSouhaitez-vous reprendre cette opération ou tout annuler ?",
+                    [
+                        ['type' => 'reply', 'reply' => ['id' => 'resume_session', 'title' => 'Reprendre']],
+                        ['type' => 'reply', 'reply' => ['id' => 'cancel_session', 'title' => 'Nouvelle opération']]
+                    ]
                 );
 
-                // Nettoyer le flux de la metadata
-                $metadata = $conversation->metadata;
-                unset($metadata['complaint_flow']);
-                $conversation->update(['metadata' => $metadata]);
-
-                return "Votre plainte a bien été enregistrée. 📋\n\nRéférence : *{$ticket->reference}*\n\nNotre équipe va examiner votre demande et vous contactera dans les plus brefs délais. Puis-je vous aider avec autre chose ?";
-            } catch (\Exception $e) {
-                Log::error('Erreur lors de la création de la plainte : ' . $e->getMessage());
-
-                // Nettoyer le flux en cas d'erreur
-                $metadata = $conversation->metadata;
-                unset($metadata['complaint_flow']);
-                $conversation->update(['metadata' => $metadata]);
-
-                return "Je suis désolée, une erreur est survenue lors de l'enregistrement de votre plainte. Veuillez réessayer ou contacter directement notre agence au 218, Avenue Colonel Ebeya Gombe, Kinshasa-RDC.";
+                return "";
             }
         }
 

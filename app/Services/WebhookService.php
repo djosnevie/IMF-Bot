@@ -51,6 +51,9 @@ class WebhookService
                 } elseif ($interactive['type'] === 'list_reply') {
                     $parsedData['content'] = $interactive['list_reply']['title'] ?? '';
                     $parsedData['list_id'] = $interactive['list_reply']['id'] ?? null;
+                } elseif ($interactive['type'] === 'nfm_reply') {
+                    $parsedData['content'] = $interactive['nfm_reply']['name'] ?? '';
+                    $parsedData['flow_data'] = json_decode($interactive['nfm_reply']['response_json'] ?? '{}', true);
                 }
             } else {
                 $parsedData['content'] = '';
@@ -320,9 +323,65 @@ class WebhookService
     }
 
     /**
+     * Send WhatsApp Flow Message
+     */
+    public function sendFlowMessage(string $to, string $bodyText, string $flowToken, string $ctaText = 'Ouvrir'): bool
+    {
+        try {
+            $accessToken = config('chatbot.whatsapp_access_token');
+            $phoneNumberId = config('chatbot.whatsapp_phone_number_id');
+            $flowId = env('WHATSAPP_COMPLAINT_FLOW_ID', 'COMPLAINT_FORM'); // Fallback to what user provided
+
+            $flowIdentifierKey = is_numeric($flowId) ? 'flow_id' : 'flow_name';
+
+            $interactive = [
+                'type' => 'flow',
+                'body' => [
+                    'text' => $bodyText
+                ],
+                'action' => [
+                    'name' => 'flow',
+                    'parameters' => [
+                        'flow_message_version' => '3',
+                        'flow_token' => $flowToken,
+                        $flowIdentifierKey => $flowId,
+                        'mode' => env('WHATSAPP_FLOW_MODE', 'draft'), // Permet de tester les brouillons
+                        'flow_cta' => $ctaText
+                    ]
+                ]
+            ];
+
+            $data = [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $to,
+                'type' => 'interactive',
+                'interactive' => $interactive
+            ];
+
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'Bearer ' . $accessToken,
+                'Content-Type' => 'application/json',
+            ])->post("https://graph.facebook.com/v18.0/{$phoneNumberId}/messages", $data);
+
+            if ($response->successful()) {
+                \Log::info('✅ Flow envoyé avec succès', ['to' => $to]);
+                return true;
+            }
+
+            \Log::error('❌ Erreur envoi Flow', ['response' => $response->json()]);
+            return false;
+
+        } catch (\Exception $e) {
+            \Log::error('WhatsApp send flow error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Send WhatsApp CTA URL (Interactive message)
      */
-    public function sendCtaUrlMessage(string $to, string $bodyText, string $buttonText, string $url): bool
+    public function sendCtaUrlMessage(string $to, string $bodyText, string $buttonText, string $url, ?string $headerText = null, ?string $footerText = null): bool
     {
         try {
             $accessToken = config('chatbot.whatsapp_access_token');
@@ -341,6 +400,19 @@ class WebhookService
                     ]
                 ]
             ];
+
+            if ($headerText) {
+                $interactive['header'] = [
+                    'type' => 'text',
+                    'text' => $headerText
+                ];
+            }
+
+            if ($footerText) {
+                $interactive['footer'] = [
+                    'text' => $footerText
+                ];
+            }
 
             $data = [
                 'messaging_product' => 'whatsapp',

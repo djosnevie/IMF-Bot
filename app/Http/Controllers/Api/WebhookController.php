@@ -102,33 +102,12 @@ class WebhookController extends Controller
                 'content' => $content
             ]);
 
-            // Check if it's a greeting request
-            if ($messageType === 'text' && $this->welcomeService->isGreetingRequest($content)) {
-                \Log::info('👋 Envoi du message d\'accueil');
-
-                // Simuler la frappe avant le message d'accueil
-                $greetingText = "Bonjour 👋🏽, je suis Sophie, assistante virtuelle de l'IMF Bisou Bisou.\n\nComment puis-je vous aider aujourd'hui ?\n\nJe peux vous renseigner sur nos comptes, crédits et services.";
-                $this->webhookService->simulateTyping($parsedData['message_id'], $greetingText);
-
-                $sent = $this->welcomeService->sendGreetingMessage($userIdentifier);
-
-                $this->webhookService->logWebhook(
-                    'whatsapp',
-                    $payload,
-                    ['greeting_sent' => $sent],
-                    'success',
-                    null,
-                    $ipAddress
-                );
-
-                return response()->json(['status' => 'ok'], 200);
-            }
-
             $isText = $messageType === 'text' && !empty($content);
+            $isInteractive = $messageType === 'interactive';
 
-            // For text messages, process with ChatbotService
-            if ($isText) {
-                \Log::info('🤖 Traitement avec ChatbotService', ['content' => $content]);
+            // For text and interactive messages, process with ChatbotService
+            if ($isText || $isInteractive) {
+                \Log::info('🤖 Traitement avec ChatbotService', ['content' => $content, 'type' => $messageType]);
 
                 $result = $this->chatbotService->processMessage(
                     $userIdentifier,
@@ -145,29 +124,21 @@ class WebhookController extends Controller
                         $this->webhookService->simulateTyping($parsedData['message_id'], $aiResponse);
                     }
 
-                    if (!empty($result['send_as_flow'])) {
-                        // Generate short token URL
-                        $token = \Illuminate\Support\Str::random(6);
-                        
-                        $payloadData = [
-                            'user_identifier' => $userIdentifier,
-                            'conversation_id' => $result['conversation_id'],
-                        ];
-                        \Illuminate\Support\Facades\Cache::put('complaint_token_' . $token, $payloadData, now()->addMinutes(15));
-                        
-                        $url = url('/wa/c/' . $token);
-
+                    if (!empty($result['send_as_cta_url'])) {
+                        $token = $result['form_token'];
                         $this->webhookService->sendCtaUrlMessage(
                             $userIdentifier, 
-                            trim($aiResponse) ?: "Veuillez cliquer sur le bouton ci-dessous pour remplir le formulaire de plainte.", 
-                            "Ouvrir formulaire", 
-                            $url
+                            "Appuyez ci-dessous pour déposer votre réclamation.\n\nLien valable 10 min • Formulaire sécurisé", 
+                            "Ma réclamation", 
+                            env('APP_URL') . '/wa/c/' . $token,
+                            "Réclamation",
+                            "IMF Bisou Bisou"
                         );
                     } elseif (!empty($aiResponse)) {
                         // Send response via WhatsApp as plain text
                         $this->webhookService->sendWhatsAppMessage(
                             $userIdentifier,
-                            trim($aiResponse)
+                            $aiResponse
                         );
                     }
 

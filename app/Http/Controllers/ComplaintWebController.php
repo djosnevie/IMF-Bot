@@ -67,7 +67,7 @@ class ComplaintWebController extends Controller
 
         // Send WhatsApp confirmation
         $confirmationMessage = "Votre demande a été enregistrée avec succès sous la référence *" . $ticket->reference . "*. Notre équipe l'examinera dans les plus brefs délais.";
-        $webhookService->sendWhatsAppMessage($validated['user_identifier'], $confirmationMessage);
+        $webhookService->sendWhatsAppMessage($conversation->user_identifier, $confirmationMessage);
 
         return view('complaints.success', [
             'reference' => $ticket->reference
